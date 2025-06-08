@@ -5,12 +5,17 @@ from collections import deque
 import heapq
 import uuid
 from pathlib import Path
-import shutil, json
+import shutil
+import json
+import logging
 from ai_scientist.treesearch.backend import query, FunctionSpec
 from .latex_editor import propose_edit, EDITOR_MODEL
 from .llm_review import llm_review, DEFAULT_MODEL
 from .vlm_review import vlm_review, VLM_MODEL
 from .meta_review import meta_score
+from .utils import unique_subdir
+
+logger = logging.getLogger(__name__)
 
 ORCHESTRATOR_MODEL = "gpt-4o-2024-11-20"
 
@@ -114,7 +119,7 @@ class Journal:
             if selected:
                 return selected
         except Exception as exc:
-            print(f"Orchestrator selection failed: {exc}")
+            logger.error("Orchestrator selection failed: %s", exc)
         return max(self.nodes, key=lambda n: n.score or 0)
 
 
@@ -139,17 +144,17 @@ def breadth_first_improve(
     best_state = root
     while frontier:
         state = frontier.popleft()
-        print(f"Evaluating depth={state.depth} dir={state.latex_dir}")
+        logger.info("Evaluating depth=%s dir=%s", state.depth, state.latex_dir)
         score = state.score if state is root else state.evaluate()
         if score > best_state.score:
             best_state = state
-            print(f"[NEW BEST] score={score:.3f} at {state.latex_dir}")
+            logger.info("[NEW BEST] score=%.3f at %s", score, state.latex_dir)
         if state.depth >= max_depth:
             continue
         # Expand children by proposing edits
         for i in range(beam_size):
-            child_dir = state.latex_dir.parent / f"child_d{state.depth}_{i}"
-            shutil.copytree(state.latex_dir, child_dir, dirs_exist_ok=True)
+            child_dir = unique_subdir(state.latex_dir.parent, f"d{state.depth}")
+            shutil.copytree(state.latex_dir, child_dir)
             tex_path = child_dir / "template.tex"
             new_source = propose_edit(
                 tex_path,
@@ -192,12 +197,14 @@ def tree_search_improve(
 
     while frontier:
         _, node = heapq.heappop(frontier)
-        print(f"Exploring depth={node.depth} dir={node.latex_dir} score={node.score:.3f}")
+        logger.info(
+            "Exploring depth=%s dir=%s score=%.3f", node.depth, node.latex_dir, node.score
+        )
         if node.depth >= max_depth:
             continue
         for i in range(beam_size):
-            child_dir = node.latex_dir.parent / f"node_d{node.depth}_{i}"
-            shutil.copytree(node.latex_dir, child_dir, dirs_exist_ok=True)
+            child_dir = unique_subdir(node.latex_dir.parent, f"d{node.depth}")
+            shutil.copytree(node.latex_dir, child_dir)
             tex_path = child_dir / "template.tex"
             new_source = propose_edit(
                 tex_path,

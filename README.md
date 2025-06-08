@@ -27,15 +27,15 @@ This system autonomously generates hypotheses, runs experiments, analyzes data, 
 
 ## Table of Contents
 
-1.  [Requirements](#requirements)
-    *   [Installation](#installation)
-    *   [Supported Models and API Keys](#supported-models-and-api-keys)
-2.  [Generate Research Ideas](#generate-research-ideas)
-3.  [Run AI Scientist-v2 Paper Generation Experiments](#run-ai-scientist-v2-paper-generation-experiments)
-4.  [Minimal Paper Improver Example](#minimal-paper-improver-example)
-5.  [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
-6.  [Frequently Asked Questions](#frequently-asked-questions)
-7.  [Acknowledgement](#acknowledgement)
+- [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Supported Models and API Keys](#supported-models-and-api-keys)
+- [Generate Research Ideas](#generate-research-ideas)
+- [Run AI Scientist-v2 Paper Generation Experiments](#run-ai-scientist-v2-paper-generation-experiments)
+- [Minimal Paper Improver Example](#minimal-paper-improver-example)
+- [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Acknowledgement](#acknowledgement)
 
 ## Requirements
 
@@ -164,8 +164,12 @@ python scripts/launch_paper_improver.py examples/paper_improver_minimal \
     --human-reviews examples/paper_improver_minimal/human_reviews.txt \
     --max-depth 1 --beam-size 1 \
     --model-editor o1-preview-2024-09-12 \
-    --model-review gpt-4o-2024-11-20
+    --model-review gpt-4o-2024-11-20 \
+    --model-vlm gpt-4o-2024-11-20 \
+    --model-orchestrator gpt-4o-2024-11-20
 ```
+
+You can override API keys at runtime via `--openai-api-key` or `--gemini-api-key`.
 
 This runs a single-depth search over the included LaTeX project and produces an
 improved version inside the same directory.

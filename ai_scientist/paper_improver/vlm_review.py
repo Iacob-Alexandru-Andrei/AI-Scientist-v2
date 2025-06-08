@@ -1,5 +1,4 @@
 """Figure-centric VLM review wrapper."""
-from pathlib import Path
 from ai_scientist.perform_vlm_review import perform_imgs_cap_ref_review
 from ai_scientist.vlm import create_client as create_vlm_client
 

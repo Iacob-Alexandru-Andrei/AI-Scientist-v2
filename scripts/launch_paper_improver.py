@@ -2,6 +2,7 @@
 """CLI for the paper improver."""
 import argparse
 import json
+import logging
 from pathlib import Path
 from ai_scientist.paper_improver import improve_paper
 
@@ -41,6 +42,8 @@ parser.add_argument("--openai-api-key")
 parser.add_argument("--gemini-api-key")
 
 args = parser.parse_args()
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
 if args.openai_api_key:
     import os

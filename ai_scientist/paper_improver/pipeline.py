@@ -1,9 +1,12 @@
 """High-level orchestration: given inputs, run the improver search."""
 from pathlib import Path
+import logging
 from .search import breadth_first_improve, tree_search_improve, ORCHESTRATOR_MODEL
 from .latex_editor import EDITOR_MODEL
 from .llm_review import DEFAULT_MODEL
 from .vlm_review import VLM_MODEL
+
+logger = logging.getLogger(__name__)
 
 
 def improve_paper(
@@ -40,5 +43,5 @@ def improve_paper(
             orchestrator_model=orchestrator_model,
             **kwargs,
         )
-    print("Best improved paper saved at", best_state.latex_dir)
+    logger.info("Best improved paper saved at %s", best_state.latex_dir)
     return best_state
