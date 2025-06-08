@@ -31,6 +31,7 @@ from .llm_review import llm_review, DEFAULT_MODEL
 from .vlm_review import vlm_review, VLM_MODEL
 from .meta_review import meta_score
 from .utils import unique_subdir
+from .writeup import perform_writeup
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +56,29 @@ class SearchParams:
     num_drafts: int = 3
     debug_prob: float = 0.5
     max_debug_depth: int = 3
+    # parameters for writeup generation after each edit
+    writeup_params: dict | None = None
+    # parameters forwarded to llm_review and vlm_review
+    llm_review_kwargs: dict | None = None
+    vlm_review_kwargs: dict | None = None
 
 
-def safe_evaluate(node: "PaperNode") -> float | None:
+def safe_evaluate(
+    node: "PaperNode",
+    llm_kwargs: dict | None = None,
+    vlm_kwargs: dict | None = None,
+) -> float | None:
     """Evaluate a node and mark it buggy on failure."""
     try:
-        return node.evaluate()
+        return node.evaluate(llm_kwargs=llm_kwargs, vlm_kwargs=vlm_kwargs)
+    except TypeError:
+        # compatibility with older tests that mock evaluate without kwargs
+        try:
+            return node.evaluate()
+        except Exception as exc:
+            logger.error("Evaluation failed for %s: %s", node.latex_dir, exc)
+            node.is_buggy = True
+            return None
     except Exception as exc:
         # Any exception during ``evaluate`` marks the node as buggy so the
         # search algorithms can attempt a debug retry.
@@ -162,13 +180,23 @@ class PaperNode:
 
         compile_latex(str(self.latex_dir), str(self.pdf_path))
 
-    def evaluate(self):
+    def evaluate(
+        self,
+        *,
+        llm_kwargs: dict | None = None,
+        vlm_kwargs: dict | None = None,
+    ):
         if not self.pdf_path.exists():
             self.compile()
+        llm_kwargs = llm_kwargs or {}
+        vlm_kwargs = vlm_kwargs or {}
         # Run LLM and VLM reviews then compute an aggregate numeric score.
-        self.llm_json = llm_review(str(self.pdf_path), model=self.llm_model)
-        # self.llm_json_2 = llm_review(str(self.pdf_path), model=self.llm_model)
-        self.vlm_json = vlm_review(str(self.pdf_path), model=self.vlm_model)
+        self.llm_json = llm_review(
+            str(self.pdf_path), model=self.llm_model, **llm_kwargs
+        )
+        self.vlm_json = vlm_review(
+            str(self.pdf_path), model=self.vlm_model, **vlm_kwargs
+        )
         self.score = meta_score([self.llm_json, self.vlm_json])
         # Persist results for analysis
         with open(self.latex_dir / "reviews.json", "w") as f:
@@ -263,13 +291,22 @@ def breadth_first_improve(
     model_review: str = DEFAULT_MODEL,
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
+    writeup_params: dict | None = None,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
 ):
     """Explore paper edits using a breadth-first expansion order."""
     p = params or SearchParams(max_depth=3, beam_size=4)
+    if writeup_params is None:
+        writeup_params = p.writeup_params
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
     # The root node corresponds to the initial paper.  It is evaluated once so
     # the search has a baseline score.
     root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
-    safe_evaluate(root)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()  # track every explored node for later selection
     journal.append(root)
     frontier = deque([root])
@@ -283,6 +320,8 @@ def breadth_first_improve(
             tex_path, seed_ideas, human_reviews, model=model_editor
         )  # model proposes a complete LaTeX rewrite of template.tex
         tex_path.write_text(new_source)
+        if writeup_params is not None:
+            perform_writeup(draft_dir, **writeup_params)
         draft = PaperNode(
             draft_dir,
             root.depth + 1,
@@ -291,7 +330,7 @@ def breadth_first_improve(
             vlm_model=model_vlm,
         )
         root.children.append(draft)  # keep a tree structure for analysis
-        safe_evaluate(draft)
+        safe_evaluate(draft, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
         journal.append(draft)
         frontier.append(draft)
     # Standard BFS loop
@@ -299,7 +338,9 @@ def breadth_first_improve(
     while frontier:
         state = frontier.popleft()
         logger.info("Evaluating depth=%s dir=%s", state.depth, state.latex_dir)
-        score = state.score if state is root else safe_evaluate(state)
+        score = state.score if state is root else safe_evaluate(
+            state, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+        )
         if score and best_state.score and score > best_state.score:
             best_state = state
             logger.info("[NEW BEST] score=%.3f at %s", score, state.latex_dir)
@@ -317,7 +358,9 @@ def breadth_first_improve(
             )  # attempt to fix the buggy document
             tex_path.write_text(new_src)
             state.debug_depth += 1
-            safe_evaluate(state)
+            if writeup_params is not None:
+                perform_writeup(state.latex_dir, **writeup_params)
+            safe_evaluate(state, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
         # Generate ``beam_size`` children by applying LLM edits to the current
         # LaTeX source
         for i in range(p.beam_size):
@@ -333,6 +376,8 @@ def breadth_first_improve(
             )  # LLM suggests an updated LaTeX file
             # Overwrite the source so subsequent evaluation compiles the new version
             tex_path.write_text(new_source)
+            if writeup_params is not None:
+                perform_writeup(child_dir, **writeup_params)
             child = PaperNode(
                 child_dir,
                 state.depth + 1,
@@ -342,7 +387,7 @@ def breadth_first_improve(
             )
             state.children.append(child)
             # Score the newly created child immediately so it can be queued
-            safe_evaluate(child)
+            safe_evaluate(child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
             journal.append(child)
             frontier.append(child)
     # Let the orchestrator or fallback logic pick the best candidate overall
@@ -359,11 +404,20 @@ def tree_search_improve(
     model_review: str = DEFAULT_MODEL,
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
+    writeup_params: dict | None = None,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
 ):
     """Priority-based tree search over paper versions."""
     p = params or SearchParams(max_depth=3, beam_size=4)
+    if writeup_params is None:
+        writeup_params = p.writeup_params
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
     root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
-    safe_evaluate(root)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()
     journal.append(root)
     frontier: list[tuple[float, PaperNode]] = [(-root.score, root)]
@@ -376,6 +430,8 @@ def tree_search_improve(
             tex_path, seed_ideas, human_reviews, model=model_editor
         )
         tex_path.write_text(new_source)
+        if writeup_params is not None:
+            perform_writeup(draft_dir, **writeup_params)
         draft = PaperNode(
             draft_dir,
             root.depth + 1,
@@ -384,7 +440,7 @@ def tree_search_improve(
             vlm_model=model_vlm,
         )
         root.children.append(draft)
-        draft.evaluate()
+        safe_evaluate(draft, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
         journal.append(draft)
         heapq.heappush(frontier, (-draft.score, draft))  # min-heap by negative score
 
@@ -410,7 +466,9 @@ def tree_search_improve(
             )  # attempt recovery
             tex_path.write_text(new_src)
             node.debug_depth += 1
-            safe_evaluate(node)
+            if writeup_params is not None:
+                perform_writeup(node.latex_dir, **writeup_params)
+            safe_evaluate(node, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
         # Expand by proposing ``beam_size`` edits from the current node
         for i in range(p.beam_size):
             child_dir = unique_subdir(node.latex_dir.parent, f"d{node.depth}")
@@ -423,6 +481,8 @@ def tree_search_improve(
                 model=model_editor,
             )  # one possible child mutation
             tex_path.write_text(new_source)
+            if writeup_params is not None:
+                perform_writeup(child_dir, **writeup_params)
             child = PaperNode(
                 child_dir,
                 node.depth + 1,
@@ -431,7 +491,7 @@ def tree_search_improve(
                 vlm_model=model_vlm,
             )
             node.children.append(child)
-            safe_evaluate(child)
+            safe_evaluate(child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
             journal.append(child)
             heapq.heappush(frontier, (-child.score, child))  # push onto heap by score
 

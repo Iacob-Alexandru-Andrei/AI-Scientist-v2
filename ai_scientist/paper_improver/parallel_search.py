@@ -27,12 +27,24 @@ from .search import (
     ORCHESTRATOR_MODEL,
 )
 from .utils import unique_subdir
+from .writeup import perform_writeup
 
 logger = logging.getLogger(__name__)
 
 
-def _expand_and_score(args: Tuple[PaperNode, str, str | None, int, str, str, str]):
-    node, seed_ideas, human_reviews, beam_size, model_editor, model_review, model_vlm = args
+def _expand_and_score(args: Tuple[PaperNode, str, str | None, int, str, str, str, dict | None, dict | None, dict | None]):
+    (
+        node,
+        seed_ideas,
+        human_reviews,
+        beam_size,
+        model_editor,
+        model_review,
+        model_vlm,
+        writeup_params,
+        llm_kwargs,
+        vlm_kwargs,
+    ) = args
     children = []
     for _ in range(beam_size):
         child_dir = unique_subdir(node.latex_dir.parent, f"d{node.depth}")
@@ -40,9 +52,11 @@ def _expand_and_score(args: Tuple[PaperNode, str, str | None, int, str, str, str
         tex_path = child_dir / "template.tex"
         new_source = propose_edit(tex_path, seed_ideas, human_reviews, model=model_editor)
         tex_path.write_text(new_source)
+        if writeup_params is not None:
+            perform_writeup(child_dir, **writeup_params)
         child = PaperNode(child_dir, node.depth + 1, parent=node, llm_model=model_review, vlm_model=model_vlm)
         node.children.append(child)
-        safe_evaluate(child)
+        safe_evaluate(child, llm_kwargs=llm_kwargs, vlm_kwargs=vlm_kwargs)
         children.append(child)
     return children
 
@@ -132,11 +146,20 @@ def parallel_tree_search_improve(
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
     max_workers: int = 4,
+    writeup_params: dict | None = None,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
 ) -> Tuple[PaperNode, Journal]:
     """Run a simple parallel tree search over LaTeX edits."""
     p = params or SearchParams(max_depth=3, beam_size=4)
+    if writeup_params is None:
+        writeup_params = p.writeup_params
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
     root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
-    safe_evaluate(root)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()
     journal.append(root)
     best_state = root
@@ -152,7 +175,18 @@ def parallel_tree_search_improve(
                 tasks.append(
                     ex.submit(
                         _expand_and_score,
-                        (parent, seed_ideas, human_reviews, p.beam_size, model_editor, model_review, model_vlm),
+                        (
+                            parent,
+                            seed_ideas,
+                            human_reviews,
+                            p.beam_size,
+                            model_editor,
+                            model_review,
+                            model_vlm,
+                            writeup_params,
+                            llm_review_kwargs,
+                            vlm_review_kwargs,
+                        ),
                     )
                 )
 

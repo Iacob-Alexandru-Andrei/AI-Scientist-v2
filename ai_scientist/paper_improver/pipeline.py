@@ -57,6 +57,8 @@ def improve_paper(
     llm_num_reflections: int = 1,
     llm_num_fs_examples: int = 1,
     llm_temperature: float = 0.75,
+    vlm_review_kwargs: dict | None = None,
+    llm_review_kwargs: dict | None = None,
     output_dir: str | Path | None = None,
     max_depth: int = 3,
     beam_size: int = 4,
@@ -85,6 +87,15 @@ def improve_paper(
         num_drafts=num_drafts,
         debug_prob=debug_prob,
         max_debug_depth=max_debug_depth,
+        writeup_params={
+            "num_cite_rounds": num_cite_rounds,
+            "small_model": model_citation,
+            "big_model": model_editor,
+            "n_writeup_reflections": num_reflections,
+            "page_limit": page_limit,
+        },
+        llm_review_kwargs=llm_review_kwargs,
+        vlm_review_kwargs=vlm_review_kwargs,
     )
     if strategy == "parallel":
         best_state, _journal = parallel_tree_search_improve(
@@ -96,6 +107,9 @@ def improve_paper(
             model_review=model_review,
             model_vlm=model_vlm,
             orchestrator_model=orchestrator_model,
+            writeup_params=params.writeup_params,
+            llm_review_kwargs=llm_review_kwargs,
+            vlm_review_kwargs=vlm_review_kwargs,
             **kwargs,
         )
     elif strategy == "tree":
@@ -110,6 +124,9 @@ def improve_paper(
             model_review=model_review,
             model_vlm=model_vlm,
             orchestrator_model=orchestrator_model,
+            writeup_params=params.writeup_params,
+            llm_review_kwargs=llm_review_kwargs,
+            vlm_review_kwargs=vlm_review_kwargs,
             **kwargs,
         )
     else:
@@ -123,6 +140,9 @@ def improve_paper(
             model_review=model_review,
             model_vlm=model_vlm,
             orchestrator_model=orchestrator_model,
+            writeup_params=params.writeup_params,
+            llm_review_kwargs=llm_review_kwargs,
+            vlm_review_kwargs=vlm_review_kwargs,
             **kwargs,
         )
     # Optionally refine citations for the best candidate
