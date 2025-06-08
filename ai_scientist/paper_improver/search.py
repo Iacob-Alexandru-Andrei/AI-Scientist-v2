@@ -113,8 +113,8 @@ class Journal:
             selected = next((n for n in self.nodes if n.id == selection["selected_id"]), None)
             if selected:
                 return selected
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"Orchestrator selection failed: {exc}")
         return max(self.nodes, key=lambda n: n.score or 0)
 
 

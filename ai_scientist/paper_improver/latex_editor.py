@@ -49,7 +49,7 @@ Improve the document **in place** focusing on clarity, scientific rigour, and ad
     )
     # Extract LaTeX from fenced block – simple heuristic
     import re, textwrap
-    code = re.search(r"```latex(.*)```", resp.choices[0].message.content, re.DOTALL)
+    code = re.search(r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL)
     if not code:
         raise ValueError("No LaTeX block returned by editor model")
     new_source = textwrap.dedent(code.group(1)).strip()

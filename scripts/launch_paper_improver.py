@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CLI for the paper improver."""
-import argparse, json
+import argparse
+import json
 from pathlib import Path
 from ai_scientist.paper_improver import improve_paper
 
@@ -50,12 +51,12 @@ if args.gemini_api_key:
 
     os.environ["GEMINI_API_KEY"] = args.gemini_api_key
 
-seed_ideas = json.loads(Path(args.seed_ideas_json).read_text())
+seed_ideas = Path(args.seed_ideas_json).read_text()
 human_reviews = Path(args.human_reviews).read_text() if args.human_reviews else None
 
 improve_paper(
     args.latex_dir,
-    json.dumps(seed_ideas, indent=2),
+    seed_ideas,
     human_reviews,
     max_depth=args.max_depth,
     beam_size=args.beam_size,
