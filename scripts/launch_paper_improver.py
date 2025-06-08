@@ -16,7 +16,39 @@ parser.add_argument(
     default="bfs",
     help="Search strategy to use: simple bfs or priority tree search",
 )
+parser.add_argument(
+    "--model-editor",
+    default="o1-preview-2024-09-12",
+    help="LLM used to propose edits",
+)
+parser.add_argument(
+    "--model-review",
+    default="gpt-4o-2024-11-20",
+    help="Model used for text-based review",
+)
+parser.add_argument(
+    "--model-vlm",
+    default="gpt-4o-2024-11-20",
+    help="Model used for VLM figure review",
+)
+parser.add_argument(
+    "--model-orchestrator",
+    default="gpt-4o-2024-11-20",
+    help="Model used to select the best node",
+)
+parser.add_argument("--openai-api-key")
+parser.add_argument("--gemini-api-key")
+
 args = parser.parse_args()
+
+if args.openai_api_key:
+    import os
+
+    os.environ["OPENAI_API_KEY"] = args.openai_api_key
+if args.gemini_api_key:
+    import os
+
+    os.environ["GEMINI_API_KEY"] = args.gemini_api_key
 
 seed_ideas = json.loads(Path(args.seed_ideas_json).read_text())
 human_reviews = Path(args.human_reviews).read_text() if args.human_reviews else None
@@ -28,4 +60,8 @@ improve_paper(
     max_depth=args.max_depth,
     beam_size=args.beam_size,
     strategy=args.strategy,
+    model_editor=args.model_editor,
+    model_review=args.model_review,
+    model_vlm=args.model_vlm,
+    orchestrator_model=args.model_orchestrator,
 )

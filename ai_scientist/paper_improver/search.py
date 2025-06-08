@@ -7,9 +7,9 @@ import uuid
 from pathlib import Path
 import shutil, json
 from ai_scientist.treesearch.backend import query, FunctionSpec
-from .latex_editor import propose_edit
-from .llm_review import llm_review
-from .vlm_review import vlm_review
+from .latex_editor import propose_edit, EDITOR_MODEL
+from .llm_review import llm_review, DEFAULT_MODEL
+from .vlm_review import vlm_review, VLM_MODEL
 from .meta_review import meta_score
 
 ORCHESTRATOR_MODEL = "gpt-4o-2024-11-20"
@@ -37,11 +37,20 @@ node_selection_spec = FunctionSpec(
 class PaperNode:
     """A paper version on disk (latex_dir contains template.tex)."""
 
-    def __init__(self, latex_dir: Path, depth: int = 0, parent: "PaperNode | None" = None):
+    def __init__(
+        self,
+        latex_dir: Path,
+        depth: int = 0,
+        parent: "PaperNode | None" = None,
+        llm_model: str = DEFAULT_MODEL,
+        vlm_model: str = VLM_MODEL,
+    ):
         self.id = uuid.uuid4().hex
         self.latex_dir = latex_dir
         self.depth = depth
         self.parent = parent
+        self.llm_model = llm_model
+        self.vlm_model = vlm_model
         self.children: list["PaperNode"] = []
         self.pdf_path = latex_dir / "template.pdf"  # compiled later
         self.score: float | None = None
@@ -59,8 +68,8 @@ class PaperNode:
     def evaluate(self):
         if not self.pdf_path.exists():
             self.compile()
-        self.llm_json = llm_review(str(self.pdf_path))
-        self.vlm_json = vlm_review(str(self.pdf_path))
+        self.llm_json = llm_review(str(self.pdf_path), model=self.llm_model)
+        self.vlm_json = vlm_review(str(self.pdf_path), model=self.vlm_model)
         self.score = meta_score([self.llm_json, self.vlm_json])
         # Persist results for analysis
         with open(self.latex_dir / "reviews.json", "w") as f:
@@ -78,7 +87,7 @@ class Journal:
         node.step = len(self.nodes)
         self.nodes.append(node)
 
-    def best_node(self) -> PaperNode | None:
+    def best_node(self, orchestrator_model: str = ORCHESTRATOR_MODEL) -> PaperNode | None:
         if not self.nodes:
             return None
         if len(self.nodes) == 1:
@@ -98,7 +107,7 @@ class Journal:
                 system_message=prompt,
                 user_message=None,
                 func_spec=node_selection_spec,
-                model=ORCHESTRATOR_MODEL,
+                model=orchestrator_model,
                 temperature=0.3,
             )
             selected = next((n for n in self.nodes if n.id == selection["selected_id"]), None)
@@ -115,9 +124,14 @@ def breadth_first_improve(
     human_reviews: str | None = None,
     max_depth: int = 3,
     beam_size: int = 4,
+    *,
+    model_editor: str = EDITOR_MODEL,
+    model_review: str = DEFAULT_MODEL,
+    model_vlm: str = VLM_MODEL,
+    orchestrator_model: str = ORCHESTRATOR_MODEL,
 ):
     """Explore paper edits using best-first strategy."""
-    root = PaperNode(root_dir)
+    root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
     root.evaluate()
     journal = Journal()
     journal.append(root)
@@ -137,13 +151,24 @@ def breadth_first_improve(
             child_dir = state.latex_dir.parent / f"child_d{state.depth}_{i}"
             shutil.copytree(state.latex_dir, child_dir, dirs_exist_ok=True)
             tex_path = child_dir / "template.tex"
-            new_source = propose_edit(tex_path, seed_ideas, human_reviews)
+            new_source = propose_edit(
+                tex_path,
+                seed_ideas,
+                human_reviews,
+                model=model_editor,
+            )
             tex_path.write_text(new_source)
-            child = PaperNode(child_dir, state.depth + 1, parent=state)
+            child = PaperNode(
+                child_dir,
+                state.depth + 1,
+                parent=state,
+                llm_model=model_review,
+                vlm_model=model_vlm,
+            )
             state.children.append(child)
             journal.append(child)
             frontier.append(child)
-    return journal.best_node(), journal
+    return journal.best_node(orchestrator_model), journal
 
 
 def tree_search_improve(
@@ -152,9 +177,14 @@ def tree_search_improve(
     human_reviews: str | None = None,
     max_depth: int = 3,
     beam_size: int = 4,
+    *,
+    model_editor: str = EDITOR_MODEL,
+    model_review: str = DEFAULT_MODEL,
+    model_vlm: str = VLM_MODEL,
+    orchestrator_model: str = ORCHESTRATOR_MODEL,
 ):
     """Priority-based tree search over paper versions."""
-    root = PaperNode(root_dir)
+    root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
     root.evaluate()
     journal = Journal()
     journal.append(root)
@@ -169,13 +199,24 @@ def tree_search_improve(
             child_dir = node.latex_dir.parent / f"node_d{node.depth}_{i}"
             shutil.copytree(node.latex_dir, child_dir, dirs_exist_ok=True)
             tex_path = child_dir / "template.tex"
-            new_source = propose_edit(tex_path, seed_ideas, human_reviews)
+            new_source = propose_edit(
+                tex_path,
+                seed_ideas,
+                human_reviews,
+                model=model_editor,
+            )
             tex_path.write_text(new_source)
-            child = PaperNode(child_dir, node.depth + 1, parent=node)
+            child = PaperNode(
+                child_dir,
+                node.depth + 1,
+                parent=node,
+                llm_model=model_review,
+                vlm_model=model_vlm,
+            )
             node.children.append(child)
             child.evaluate()
             journal.append(child)
             heapq.heappush(frontier, (-child.score, child))
 
-    return journal.best_node(), journal
+    return journal.best_node(orchestrator_model), journal
 

@@ -6,7 +6,12 @@ from ai_scientist.llm import create_client
 DEFAULT_MODEL = "gpt-4o-2024-11-20"
 
 
-def llm_review(tex_or_pdf_path: str, *, model: str = DEFAULT_MODEL, **kwargs) -> dict[str, Any]:
+def llm_review(
+    tex_or_pdf_path: str,
+    *,
+    model: str = DEFAULT_MODEL,
+    **kwargs,
+) -> dict[str, Any]:
     """Run the standard LLM review and return the parsed JSON.
 
     Parameters

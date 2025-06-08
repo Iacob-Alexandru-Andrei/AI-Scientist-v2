@@ -13,7 +13,19 @@ def propose_edit(
     human_reviews: str | None = None,
     model: str = EDITOR_MODEL,
 ) -> str:
-    """Return *new* LaTeX code after applying improvements suggested by the model."""
+    """Return *new* LaTeX code after applying improvements suggested by the model.
+
+    Parameters
+    ----------
+    latex_path
+        Path to the LaTeX source to edit in place.
+    seed_ideas
+        High-level suggestions guiding the improvement.
+    human_reviews
+        Optional human reviewer comments to address.
+    model
+        Model used to propose edits.
+    """
     prompt = f"""You are an expert academic writing assistant.  Below is the current LaTeX paper, a set of human reviews, and high-level improvement ideas.
 Improve the document **in place** focusing on clarity, scientific rigour, and addressing reviewers’ concerns.  Output *only* the updated LaTeX in a fenced ```latex block.
 

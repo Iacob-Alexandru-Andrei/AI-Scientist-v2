@@ -14,7 +14,7 @@ def fake_compile(cwd, pdf_file):
     Path(pdf_file).write_text(src.read_text())
 
 
-def fake_propose_edit(path, seed_ideas, human_reviews):
+def fake_propose_edit(path, seed_ideas, human_reviews, model=None):
     return path.read_text() + "X"
 
 
@@ -26,7 +26,7 @@ def fake_review(pdf_path):
 
 class DummyJournal(search.Journal):
     # override best_node to avoid LLM call
-    def best_node(self):
+    def best_node(self, orchestrator_model=search.ORCHESTRATOR_MODEL):
         return max(self.nodes, key=lambda n: n.score or 0)
 
 

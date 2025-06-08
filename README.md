@@ -162,7 +162,9 @@ files located in `examples/paper_improver_minimal/`:
 python scripts/launch_paper_improver.py examples/paper_improver_minimal \
     examples/paper_improver_minimal/seed_ideas.json \
     --human-reviews examples/paper_improver_minimal/human_reviews.txt \
-    --max-depth 1 --beam-size 1
+    --max-depth 1 --beam-size 1 \
+    --model-editor o1-preview-2024-09-12 \
+    --model-review gpt-4o-2024-11-20
 ```
 
 This runs a single-depth search over the included LaTeX project and produces an
