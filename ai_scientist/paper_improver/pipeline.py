@@ -5,6 +5,10 @@ from .search import breadth_first_improve, tree_search_improve, ORCHESTRATOR_MOD
 from .latex_editor import EDITOR_MODEL
 from .llm_review import DEFAULT_MODEL
 from .vlm_review import VLM_MODEL
+from ai_scientist.perform_icbinb_writeup import gather_citations
+
+CITATION_MODEL = "gpt-4o-2024-11-20"
+DEFAULT_CITE_ROUNDS = 20
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,8 @@ def improve_paper(
     model_review: str = DEFAULT_MODEL,
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
+    model_citation: str = CITATION_MODEL,
+    num_cite_rounds: int = DEFAULT_CITE_ROUNDS,
     **kwargs,
 ):
     root = Path(latex_project_dir).resolve()
@@ -43,5 +49,8 @@ def improve_paper(
             orchestrator_model=orchestrator_model,
             **kwargs,
         )
+    if num_cite_rounds > 0:
+        logger.info("Gathering citations with %s for %d rounds", model_citation, num_cite_rounds)
+        gather_citations(best_state.latex_dir, num_cite_rounds=num_cite_rounds, small_model=model_citation)
     logger.info("Best improved paper saved at %s", best_state.latex_dir)
     return best_state

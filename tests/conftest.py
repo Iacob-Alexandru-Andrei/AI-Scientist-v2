@@ -39,6 +39,10 @@ sys.modules.setdefault("tiktoken", types.ModuleType("tiktoken"))
 
 sys.modules.setdefault("ai_scientist.perform_llm_review", types.SimpleNamespace(perform_review=lambda *a, **k: {}))
 sys.modules.setdefault("ai_scientist.perform_vlm_review", types.SimpleNamespace(perform_imgs_cap_ref_review=lambda *a, **k: {}))
+sys.modules.setdefault(
+    "ai_scientist.perform_icbinb_writeup",
+    types.SimpleNamespace(gather_citations=lambda *a, **k: None),
+)
 sys.modules.setdefault("backoff", types.ModuleType("backoff"))
 sys.modules.setdefault("openai", types.ModuleType("openai"))
 vlm_stub = types.SimpleNamespace(create_client=create_client)

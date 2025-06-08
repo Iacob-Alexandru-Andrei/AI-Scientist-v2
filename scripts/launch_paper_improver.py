@@ -38,6 +38,17 @@ parser.add_argument(
     default="gpt-4o-2024-11-20",
     help="Model used to select the best node",
 )
+parser.add_argument(
+    "--model-citation",
+    default="gpt-4o-2024-11-20",
+    help="Model used for citation gathering",
+)
+parser.add_argument(
+    "--num-cite-rounds",
+    type=int,
+    default=20,
+    help="Number of citation rounds",
+)
 parser.add_argument("--openai-api-key")
 parser.add_argument("--gemini-api-key")
 
@@ -68,4 +79,6 @@ improve_paper(
     model_review=args.model_review,
     model_vlm=args.model_vlm,
     orchestrator_model=args.model_orchestrator,
+    model_citation=args.model_citation,
+    num_cite_rounds=args.num_cite_rounds,
 )

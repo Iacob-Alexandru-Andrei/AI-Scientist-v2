@@ -166,7 +166,9 @@ python scripts/launch_paper_improver.py examples/paper_improver_minimal \
     --model-editor o1-preview-2024-09-12 \
     --model-review gpt-4o-2024-11-20 \
     --model-vlm gpt-4o-2024-11-20 \
-    --model-orchestrator gpt-4o-2024-11-20
+    --model-orchestrator gpt-4o-2024-11-20 \
+    --model-citation gpt-4o-2024-11-20 \
+    --num-cite-rounds 20
 ```
 
 You can override API keys at runtime via `--openai-api-key` or `--gemini-api-key`.
