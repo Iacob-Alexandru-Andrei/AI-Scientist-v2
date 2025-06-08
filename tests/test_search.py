@@ -21,7 +21,13 @@ def fake_propose_edit(path, seed_ideas, human_reviews, model=None):
 def fake_review(pdf_path):
     text = Path(pdf_path).read_text()
     overall = min(10, len(text))
-    return {"Originality": 1, "Quality": 1, "Clarity": 1, "Significance": 1, "Overall": overall}
+    return {
+        "Originality": 1,
+        "Quality": 1,
+        "Clarity": 1,
+        "Significance": 1,
+        "Overall": overall,
+    }
 
 
 class DummyJournal(search.Journal):
@@ -32,6 +38,7 @@ class DummyJournal(search.Journal):
 
 def run_search(impl, tmp_path, monkeypatch):
     root = setup_dummy_env(tmp_path)
+
     def patched_evaluate(self):
         fake_compile(self.latex_dir, self.pdf_path)
         self.llm_json = fake_review(str(self.pdf_path))
@@ -40,12 +47,17 @@ def run_search(impl, tmp_path, monkeypatch):
         return self.score
 
     monkeypatch.setattr(search.PaperNode, "evaluate", patched_evaluate)
-    monkeypatch.setattr(search.PaperNode, "compile", lambda self: fake_compile(self.latex_dir, self.pdf_path))
+    monkeypatch.setattr(
+        search.PaperNode,
+        "compile",
+        lambda self: fake_compile(self.latex_dir, self.pdf_path),
+    )
     monkeypatch.setattr(search, "propose_edit", fake_propose_edit)
     monkeypatch.setattr(search, "llm_review", fake_review)
     monkeypatch.setattr(search, "vlm_review", fake_review)
     monkeypatch.setattr(search, "Journal", DummyJournal)
-    best, journal = impl(root, "ideas", None, max_depth=2, beam_size=1)
+    params = search.SearchParams(max_depth=2, beam_size=1, num_drafts=0)
+    best, journal = impl(root, "ideas", None, params=params)
     for n in journal.nodes:
         print("NODE", n.depth, n.score)
         assert n.score is not None

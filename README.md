@@ -163,6 +163,7 @@ python scripts/launch_paper_improver.py examples/paper_improver_minimal \
     examples/paper_improver_minimal/seed_ideas.json \
     --human-reviews examples/paper_improver_minimal/human_reviews.txt \
     --max-depth 1 --beam-size 1 \
+    --num-drafts 1 --debug-prob 0.5 --max-debug-depth 3 \
     --model-editor o1-preview-2024-09-12 \
     --model-review gpt-4o-2024-11-20 \
     --model-vlm gpt-4o-2024-11-20 \

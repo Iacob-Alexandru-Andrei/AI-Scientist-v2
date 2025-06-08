@@ -6,12 +6,21 @@ import logging
 from pathlib import Path
 from ai_scientist.paper_improver import improve_paper
 
-parser = argparse.ArgumentParser(description="Iteratively improve an existing paper via AI-Scientist pipeline")
+parser = argparse.ArgumentParser(
+    description="Iteratively improve an existing paper via AI-Scientist pipeline"
+)
 parser.add_argument("latex_dir", help="Directory containing template.tex (and figures)")
-parser.add_argument("seed_ideas_json", help="JSON file with high-level improvement ideas")
-parser.add_argument("--human-reviews", help="Path to txt/markdown file with reviewer comments")
+parser.add_argument(
+    "seed_ideas_json", help="JSON file with high-level improvement ideas"
+)
+parser.add_argument(
+    "--human-reviews", help="Path to txt/markdown file with reviewer comments"
+)
 parser.add_argument("--max-depth", type=int, default=2)
 parser.add_argument("--beam-size", type=int, default=3)
+parser.add_argument("--num-drafts", type=int, default=3)
+parser.add_argument("--debug-prob", type=float, default=0.5)
+parser.add_argument("--max-debug-depth", type=int, default=3)
 parser.add_argument(
     "--strategy",
     choices=["bfs", "tree"],
@@ -74,6 +83,9 @@ improve_paper(
     human_reviews,
     max_depth=args.max_depth,
     beam_size=args.beam_size,
+    num_drafts=args.num_drafts,
+    debug_prob=args.debug_prob,
+    max_debug_depth=args.max_debug_depth,
     strategy=args.strategy,
     model_editor=args.model_editor,
     model_review=args.model_review,
