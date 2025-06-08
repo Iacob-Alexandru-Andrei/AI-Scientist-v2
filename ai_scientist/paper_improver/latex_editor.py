@@ -7,6 +7,7 @@ response for a fenced `````latex`` block.  The extracted code is returned
 without writing it to disk.  Callers are responsible for updating the
 ``template.tex`` file themselves.
 """
+
 from pathlib import Path
 from ai_scientist.llm import create_client
 from ai_scientist.utils.token_tracker import track_token_usage
@@ -44,7 +45,7 @@ Improve the document **in place** focusing on clarity, scientific rigour, and ad
 ########################################
 
 ############ HUMAN REVIEWS ############
-{human_reviews or 'N/A'}
+{human_reviews or "N/A"}
 ########################################
 
 ############  SEED IDEAS   ############
@@ -60,6 +61,7 @@ Improve the document **in place** focusing on clarity, scientific rigour, and ad
     )
     # Extract LaTeX from fenced block – simple heuristic
     import re, textwrap
+
     # The model is instructed to place the revised LaTeX in a fenced block.
     # A simple non-greedy regex is used to capture that code snippet.
     code = re.search(r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL)

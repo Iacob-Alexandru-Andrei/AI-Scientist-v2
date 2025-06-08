@@ -6,6 +6,7 @@ variables and then invokes :func:`ai_scientist.paper_improver.improve_paper`.
 It mirrors the ``launch_scientist_bfts.py`` script from the main project but
 omits experiment execution.
 """
+
 import argparse
 import json
 import logging
@@ -35,27 +36,27 @@ parser.add_argument(
 )
 parser.add_argument(
     "--model-editor",
-    default="o1-preview-2024-09-12",
+    default="gemini-2.5-flash-preview-04-17",
     help="LLM used to propose edits",
 )
 parser.add_argument(
     "--model-review",
-    default="gpt-4o-2024-11-20",
+    default="gemini-2.5-flash-preview-04-17",
     help="Model used for text-based review",
 )
 parser.add_argument(
     "--model-vlm",
-    default="gpt-4o-2024-11-20",
+    default="gemini-2.5-flash-preview-04-17",
     help="Model used for VLM figure review",
 )
 parser.add_argument(
     "--model-orchestrator",
-    default="gpt-4o-2024-11-20",
+    default="gemini-2.5-flash-preview-04-17",
     help="Model used to select the best node",
 )
 parser.add_argument(
     "--model-citation",
-    default="gpt-4o-2024-11-20",
+    default="gemini-2.5-flash-preview-04-17",
     help="Model used for citation gathering",
 )
 parser.add_argument(
@@ -66,7 +67,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--model-reflection",
-    default="o1-preview-2024-09-12",
+    default="gemini-2.5-flash-preview-04-17",
     help="Model used for final reflection",
 )
 parser.add_argument(

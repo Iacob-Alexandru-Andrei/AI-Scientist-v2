@@ -1,0 +1,4 @@
+- The introduction lacks sufficient background on automated writing systems.
+- Please cite additional related work.
+- Explain the purpose of Figure 1 in more detail.
+- Conclude with a clearer summary of contributions.
