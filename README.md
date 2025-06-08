@@ -32,9 +32,10 @@ This system autonomously generates hypotheses, runs experiments, analyzes data, 
     *   [Supported Models and API Keys](#supported-models-and-api-keys)
 2.  [Generate Research Ideas](#generate-research-ideas)
 3.  [Run AI Scientist-v2 Paper Generation Experiments](#run-ai-scientist-v2-paper-generation-experiments)
-4.  [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
-5.  [Frequently Asked Questions](#frequently-asked-questions)
-6.  [Acknowledgement](#acknowledgement)
+4.  [Minimal Paper Improver Example](#minimal-paper-improver-example)
+5.  [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
+6.  [Frequently Asked Questions](#frequently-asked-questions)
+7.  [Acknowledgement](#acknowledgement)
 
 ## Requirements
 
@@ -151,6 +152,21 @@ python launch_scientist_bfts.py \
 ```
 
 Once the initial experimental stage is complete, you will find a timestamped log folder inside the `experiments/` directory. Navigate to `experiments/"timestamp_ideaname"/logs/0-run/` within that folder to find the tree visualization file `unified_tree_viz.html`.
+
+## Minimal Paper Improver Example
+
+For a quick demonstration of the `paper_improver` sub-pipeline, use the sample
+files located in `examples/paper_improver_minimal/`:
+
+```bash
+python scripts/launch_paper_improver.py examples/paper_improver_minimal \
+    examples/paper_improver_minimal/seed_ideas.json \
+    --human-reviews examples/paper_improver_minimal/human_reviews.txt \
+    --max-depth 1 --beam-size 1
+```
+
+This runs a single-depth search over the included LaTeX project and produces an
+improved version inside the same directory.
 
 ## Citing The AI Scientist-v2
 
