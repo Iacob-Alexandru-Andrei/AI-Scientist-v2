@@ -58,6 +58,23 @@ parser.add_argument(
     default=20,
     help="Number of citation rounds",
 )
+parser.add_argument(
+    "--model-reflection",
+    default="o1-preview-2024-09-12",
+    help="Model used for final reflection",
+)
+parser.add_argument(
+    "--num-reflections",
+    type=int,
+    default=3,
+    help="Number of reflection steps",
+)
+parser.add_argument(
+    "--page-limit",
+    type=int,
+    default=4,
+    help="Page limit for final reflection",
+)
 parser.add_argument("--openai-api-key")
 parser.add_argument("--gemini-api-key")
 
@@ -93,4 +110,7 @@ improve_paper(
     orchestrator_model=args.model_orchestrator,
     model_citation=args.model_citation,
     num_cite_rounds=args.num_cite_rounds,
+    model_reflection=args.model_reflection,
+    num_reflections=args.num_reflections,
+    page_limit=args.page_limit,
 )

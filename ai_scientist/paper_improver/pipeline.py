@@ -11,10 +11,19 @@ from .search import (
 from .latex_editor import EDITOR_MODEL
 from .llm_review import DEFAULT_MODEL
 from .vlm_review import VLM_MODEL
+from .reflection import (
+    reflect_paper,
+    REFLECTION_MODEL,
+    DEFAULT_ROUNDS as DEFAULT_REFLECTION_ROUNDS,
+    DEFAULT_PAGE_LIMIT,
+)
 from ai_scientist.perform_icbinb_writeup import gather_citations
 
 CITATION_MODEL = "gpt-4o-2024-11-20"
 DEFAULT_CITE_ROUNDS = 20
+REFLECTION_MODEL_DEFAULT = REFLECTION_MODEL
+DEFAULT_REFLECTION_ROUNDS = DEFAULT_REFLECTION_ROUNDS
+DEFAULT_PAGE_LIMIT_VALUE = DEFAULT_PAGE_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +39,9 @@ def improve_paper(
     orchestrator_model: str = ORCHESTRATOR_MODEL,
     model_citation: str = CITATION_MODEL,
     num_cite_rounds: int = DEFAULT_CITE_ROUNDS,
+    model_reflection: str = REFLECTION_MODEL_DEFAULT,
+    num_reflections: int = DEFAULT_REFLECTION_ROUNDS,
+    page_limit: int = DEFAULT_PAGE_LIMIT_VALUE,
     max_depth: int = 3,
     beam_size: int = 4,
     num_drafts: int = 3,
@@ -77,6 +89,17 @@ def improve_paper(
             best_state.latex_dir,
             num_cite_rounds=num_cite_rounds,
             small_model=model_citation,
+        )
+    if num_reflections > 0:
+        logger.info(
+            "Running %d reflection rounds with %s", num_reflections, model_reflection
+        )
+        reflect_paper(
+            best_state.latex_dir,
+            model=model_reflection,
+            vlm_model=model_vlm,
+            num_rounds=num_reflections,
+            page_limit=page_limit,
         )
     logger.info("Best improved paper saved at %s", best_state.latex_dir)
     return best_state

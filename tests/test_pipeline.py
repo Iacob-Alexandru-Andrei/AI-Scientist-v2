@@ -22,6 +22,7 @@ def test_improve_paper_strategy(monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline, 'breadth_first_improve', fake_bfs)
     monkeypatch.setattr(pipeline, 'tree_search_improve', fake_tree)
+    monkeypatch.setattr(pipeline, 'reflect_paper', lambda *a, **k: None)
 
     pipeline.improve_paper(root, 'ideas', strategy='bfs')
     pipeline.improve_paper(root, 'ideas', strategy='tree')
@@ -46,6 +47,7 @@ def test_improve_paper_citations(monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline, "breadth_first_improve", fake_bfs)
     monkeypatch.setattr(pipeline, "gather_citations", fake_gather)
+    monkeypatch.setattr(pipeline, "reflect_paper", lambda *a, **k: None)
 
     pipeline.improve_paper(
         root,
@@ -88,6 +90,7 @@ def test_improve_paper_hyperparams_bfs(monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline, "breadth_first_improve", fake_bfs)
     monkeypatch.setattr(pipeline, "gather_citations", lambda *a, **k: None)
+    monkeypatch.setattr(pipeline, "reflect_paper", lambda *a, **k: None)
 
     pipeline.improve_paper(
         root,
@@ -148,6 +151,7 @@ def test_improve_paper_hyperparams_tree(monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipeline, "tree_search_improve", fake_tree)
     monkeypatch.setattr(pipeline, "gather_citations", lambda *a, **k: None)
+    monkeypatch.setattr(pipeline, "reflect_paper", lambda *a, **k: None)
 
     pipeline.improve_paper(
         root,
@@ -199,3 +203,51 @@ def test_citation_defaults(monkeypatch, tmp_path):
 
     assert captured["args"] == (root.resolve(), 2, pipeline.CITATION_MODEL)
 
+
+
+def test_reflection_params(monkeypatch, tmp_path):
+    root = tmp_path / "paper"
+    root.mkdir()
+    (root / "template.tex").write_text("t")
+
+    def fake_bfs(*args, **kwargs):
+        class R:
+            latex_dir = root
+        return R(), None
+
+    captured = {}
+
+    def fake_reflect(path, *, model, vlm_model, num_rounds, page_limit):
+        captured["args"] = (Path(path), model, vlm_model, num_rounds, page_limit)
+
+    monkeypatch.setattr(pipeline, "breadth_first_improve", fake_bfs)
+    monkeypatch.setattr(pipeline, "gather_citations", lambda *a, **k: None)
+    monkeypatch.setattr(pipeline, "reflect_paper", fake_reflect)
+
+    pipeline.improve_paper(root, "ideas", num_cite_rounds=0)
+
+    assert captured["args"] == (
+        root.resolve(),
+        pipeline.REFLECTION_MODEL_DEFAULT,
+        pipeline.VLM_MODEL,
+        pipeline.DEFAULT_REFLECTION_ROUNDS,
+        pipeline.DEFAULT_PAGE_LIMIT_VALUE,
+    )
+
+    captured.clear()
+    pipeline.improve_paper(
+        root,
+        "ideas",
+        model_reflection="m",
+        num_reflections=2,
+        page_limit=5,
+        num_cite_rounds=0,
+    )
+
+    assert captured["args"] == (
+        root.resolve(),
+        "m",
+        pipeline.VLM_MODEL,
+        2,
+        5,
+    )
