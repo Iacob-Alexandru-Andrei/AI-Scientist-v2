@@ -175,3 +175,27 @@ def test_improve_paper_hyperparams_tree(monkeypatch, tmp_path):
     assert captured["review"] == "r2"
     assert captured["vlm"] == "v2"
     assert captured["orch"] == "o2"
+
+
+def test_citation_defaults(monkeypatch, tmp_path):
+    root = tmp_path / "paper"
+    root.mkdir()
+    (root / "template.tex").write_text("t")
+
+    def fake_bfs(*args, **kwargs):
+        class R:
+            latex_dir = root
+        return R(), None
+
+    captured = {}
+
+    def fake_gather(path, num_cite_rounds=20, small_model="m"):
+        captured["args"] = (Path(path), num_cite_rounds, small_model)
+
+    monkeypatch.setattr(pipeline, "breadth_first_improve", fake_bfs)
+    monkeypatch.setattr(pipeline, "gather_citations", fake_gather)
+
+    pipeline.improve_paper(root, "ideas", num_cite_rounds=2)
+
+    assert captured["args"] == (root.resolve(), 2, pipeline.CITATION_MODEL)
+

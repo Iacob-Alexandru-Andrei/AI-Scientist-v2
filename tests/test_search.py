@@ -39,11 +39,11 @@ class DummyJournal(search.Journal):
 def run_search(impl, tmp_path, monkeypatch):
     root = setup_dummy_env(tmp_path)
 
+    counter = {"i": 0}
+
     def patched_evaluate(self):
-        fake_compile(self.latex_dir, self.pdf_path)
-        self.llm_json = fake_review(str(self.pdf_path))
-        self.vlm_json = fake_review(str(self.pdf_path))
-        self.score = search.meta_score([self.llm_json, self.vlm_json])
+        counter["i"] += 1
+        self.score = float(counter["i"])
         return self.score
 
     monkeypatch.setattr(search.PaperNode, "evaluate", patched_evaluate)
@@ -72,3 +72,93 @@ def test_bfs_and_tree_search(monkeypatch, tmp_path):
     tmp2.mkdir()
     best_tree, _ = run_search(search.tree_search_improve, tmp2, monkeypatch)
     assert best_tree.depth == 2
+
+
+def test_search_params_usage(monkeypatch, tmp_path):
+    root = setup_dummy_env(tmp_path)
+    propose_calls = []
+
+    def patched_propose(path, seed_ideas, human_reviews, model=None):
+        propose_calls.append(path)
+        return path.read_text() + "X"
+
+    counter = {"i": 0}
+
+    def patched_evaluate(self):
+        counter["i"] += 1
+        self.score = float(counter["i"])
+        return self.score
+
+    monkeypatch.setattr(search, "propose_edit", patched_propose)
+    monkeypatch.setattr(search.PaperNode, "evaluate", patched_evaluate)
+    monkeypatch.setattr(search.PaperNode, "compile", lambda self: fake_compile(self.latex_dir, self.pdf_path))
+    monkeypatch.setattr(search, "llm_review", fake_review)
+    monkeypatch.setattr(search, "vlm_review", fake_review)
+    monkeypatch.setattr(search, "Journal", DummyJournal)
+
+    params = search.SearchParams(max_depth=1, beam_size=2, num_drafts=3)
+    best, journal = search.breadth_first_improve(root, "ideas", None, params=params)
+
+    assert len(propose_calls) == 5  # 3 drafts + 2 expansions
+    assert max(n.depth for n in journal.nodes) == 1
+    assert len(journal.nodes) == 6
+
+    tmp2 = tmp_path / "tree"
+    tmp2.mkdir()
+    propose_calls.clear()
+    root2 = setup_dummy_env(tmp2)
+    best2, journal2 = search.tree_search_improve(root2, "ideas", None, params=params)
+
+    assert len(propose_calls) == 5
+    assert max(n.depth for n in journal2.nodes) == 1
+    assert len(journal2.nodes) == 6
+
+
+def test_debug_retry(monkeypatch, tmp_path):
+    root = setup_dummy_env(tmp_path)
+    calls = []
+
+    def failing_eval(self):
+        calls.append("eval")
+        if len(calls) == 1:
+            self.score = 0
+            raise RuntimeError("fail")
+        self.score = 1
+        return 1
+
+    monkeypatch.setattr(search.PaperNode, "evaluate", failing_eval)
+    monkeypatch.setattr(search, "propose_edit", lambda *a, **k: "X")
+    monkeypatch.setattr(search.PaperNode, "compile", lambda self: None)
+    monkeypatch.setattr(search, "llm_review", lambda *a, **k: {})
+    monkeypatch.setattr(search, "vlm_review", lambda *a, **k: {})
+    monkeypatch.setattr(search, "Journal", DummyJournal)
+    monkeypatch.setattr(search.random, "random", lambda: 0.0)
+
+    params = search.SearchParams(max_depth=1, beam_size=0, num_drafts=0, debug_prob=1.0, max_debug_depth=1)
+    best, journal = search.breadth_first_improve(root, "ideas", None, params=params)
+
+    assert len(calls) == 2
+    assert best.debug_depth == 1
+    assert len(journal.nodes) == 1
+
+
+def test_orchestrator_model(monkeypatch):
+    j = search.Journal()
+    n1 = search.PaperNode(Path("a"))
+    n2 = search.PaperNode(Path("b"))
+    n1.score = 1
+    n2.score = 2
+    j.append(n1)
+    j.append(n2)
+
+    captured = {}
+
+    def fake_query(**kwargs):
+        captured["model"] = kwargs.get("model")
+        return {"selected_id": n2.id, "reasoning": ""}
+
+    monkeypatch.setattr(search, "query", fake_query)
+    chosen = j.best_node("orch")
+
+    assert captured["model"] == "orch"
+    assert chosen is n2
