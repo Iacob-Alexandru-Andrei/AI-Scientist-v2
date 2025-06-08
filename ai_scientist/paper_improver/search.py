@@ -20,7 +20,7 @@ from collections import deque
 import heapq
 import uuid
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import shutil
 import json
@@ -94,34 +94,66 @@ node_selection_spec = FunctionSpec(
 )
 
 
+@dataclass(eq=False)
 class PaperNode:
     """A paper version on disk (latex_dir contains template.tex)."""
 
-    def __init__(
-        self,
-        latex_dir: Path,
-        depth: int = 0,
-        parent: "PaperNode | None" = None,
-        llm_model: str = DEFAULT_MODEL,
-        vlm_model: str = VLM_MODEL,
-        debug_depth: int = 0,
-        batch_review_cnt: int = 2,
-    ):
-        self.id = uuid.uuid4().hex
-        self.latex_dir = latex_dir
-        self.depth = depth
-        self.parent = parent
-        self.llm_model = llm_model
-        self.vlm_model = vlm_model
-        self.children: list["PaperNode"] = []
-        self.pdf_path = latex_dir / "template.pdf"  # compiled later
-        self.score: float | None = None
-        self.llm_json: dict | None = None
-        self.vlm_json: dict | None = None
-        # compatibility with treesearch Journal
-        self.is_buggy = False
-        self.is_buggy_plots = False
-        self.debug_depth = debug_depth
+    latex_dir: Path
+    depth: int = 0
+    parent: "PaperNode | None" = None
+    llm_model: str = DEFAULT_MODEL
+    vlm_model: str = VLM_MODEL
+    debug_depth: int = 0
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    score: float | None = None
+    llm_json: dict | None = None
+    vlm_json: dict | None = None
+    is_buggy: bool = False
+    is_buggy_plots: bool = False
+    step: int = 0
+    children: list["PaperNode"] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.pdf_path = self.latex_dir / "template.pdf"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "latex_dir": str(self.latex_dir),
+            "depth": self.depth,
+            "parent_id": self.parent.id if self.parent else None,
+            "llm_model": self.llm_model,
+            "vlm_model": self.vlm_model,
+            "score": self.score,
+            "llm_json": self.llm_json,
+            "vlm_json": self.vlm_json,
+            "is_buggy": self.is_buggy,
+            "is_buggy_plots": self.is_buggy_plots,
+            "debug_depth": self.debug_depth,
+            "step": self.step,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, journal: "Journal" | None = None) -> "PaperNode":
+        parent = None
+        if journal and data.get("parent_id"):
+            parent = journal.get_node_by_id(data["parent_id"])
+        node = cls(
+            latex_dir=Path(data["latex_dir"]),
+            depth=data.get("depth", 0),
+            parent=parent,
+            llm_model=data.get("llm_model", DEFAULT_MODEL),
+            vlm_model=data.get("vlm_model", VLM_MODEL),
+            debug_depth=data.get("debug_depth", 0),
+        )
+        node.id = data.get("id", node.id)
+        node.score = data.get("score")
+        node.llm_json = data.get("llm_json")
+        node.vlm_json = data.get("vlm_json")
+        node.is_buggy = data.get("is_buggy", False)
+        node.is_buggy_plots = data.get("is_buggy_plots", False)
+        node.step = data.get("step", 0)
+        return node
 
     def compile(self):
         # ``compile_latex`` is reused from the main code base. It simply
@@ -159,6 +191,29 @@ class Journal:
         # implementation and simply records insertion order.
         node.step = len(self.nodes)
         self.nodes.append(node)
+
+    @property
+    def good_nodes(self) -> list[PaperNode]:
+        return [n for n in self.nodes if not n.is_buggy and not n.is_buggy_plots]
+
+    @property
+    def buggy_nodes(self) -> list[PaperNode]:
+        return [n for n in self.nodes if n.is_buggy]
+
+    def get_node_by_id(self, node_id: str) -> PaperNode | None:
+        for n in self.nodes:
+            if n.id == node_id:
+                return n
+        return None
+
+    @property
+    def draft_nodes(self) -> list[PaperNode]:
+        """Nodes without parents (initial drafts)."""
+        return [n for n in self.nodes if n.parent is None]
+
+    # Backwards compatibility with the original tree-search API
+    def get_best_node(self, orchestrator_model: str = ORCHESTRATOR_MODEL) -> PaperNode | None:
+        return self.best_node(orchestrator_model)
 
     def best_node(
         self, orchestrator_model: str = ORCHESTRATOR_MODEL
