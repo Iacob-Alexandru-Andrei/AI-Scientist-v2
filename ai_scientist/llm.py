@@ -8,7 +8,7 @@ import anthropic
 import backoff
 import openai
 
-MAX_NUM_TOKENS = 4096
+MAX_NUM_TOKENS = 8192
 
 AVAILABLE_LLMS = [
     "claude-3-5-sonnet-20240620",
@@ -64,13 +64,13 @@ AVAILABLE_LLMS = [
         anthropic.RateLimitError,
     ),
 )
-@track_token_usage
+# @track_token_usage
 def get_batch_responses_from_llm(
     prompt,
     client,
     model,
     system_message,
-    print_debug=False,
+    print_debug=True,
     msg_history=None,
     temperature=0.7,
     n_responses=1,
@@ -131,7 +131,7 @@ def get_batch_responses_from_llm(
         new_msg_history = [
             new_msg_history + [{"role": "assistant", "content": c}] for c in content
         ]
-    elif 'gemini' in model:
+    elif "gemini" in model:
         new_msg_history = msg_history + [{"role": "user", "content": msg}]
         response = client.chat.completions.create(
             model=model,
@@ -156,7 +156,7 @@ def get_batch_responses_from_llm(
                 client,
                 model,
                 system_message,
-                print_debug=False,
+                print_debug=True,
                 msg_history=None,
                 temperature=temperature,
             )
@@ -168,7 +168,7 @@ def get_batch_responses_from_llm(
         print()
         print("*" * 20 + " LLM START " + "*" * 20)
         for j, msg in enumerate(new_msg_history[0]):
-            print(f'{j}, {msg["role"]}: {msg["content"]}')
+            print(f"{j}, {msg['role']}: {msg['content']}")
         print(content)
         print("*" * 21 + " LLM END " + "*" * 21)
         print()
@@ -176,7 +176,7 @@ def get_batch_responses_from_llm(
     return content, new_msg_history
 
 
-@track_token_usage
+# @track_token_usage
 def make_llm_call(client, model, temperature, system_message, prompt):
     if "gpt" in model:
         return client.chat.completions.create(
@@ -202,7 +202,17 @@ def make_llm_call(client, model, temperature, system_message, prompt):
             n=1,
             seed=0,
         )
-    
+    elif "gemini" in model:
+        return client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_message},
+                *prompt,
+            ],
+            temperature=temperature,
+            max_tokens=MAX_NUM_TOKENS,
+            n=1,
+        )
     else:
         raise ValueError(f"Model {model} not supported.")
 
@@ -221,7 +231,7 @@ def get_response_from_llm(
     client,
     model,
     system_message,
-    print_debug=False,
+    print_debug=True,
     msg_history=None,
     temperature=0.7,
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -316,25 +326,29 @@ def get_response_from_llm(
         except Exception as e:
             # Fallback to direct API call if OpenAI client doesn't work with HuggingFace
             import requests
+
             headers = {
                 "Authorization": f"Bearer {os.environ['HUGGINGFACE_API_KEY']}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
             payload = {
                 "inputs": {
                     "system": system_message,
-                    "messages": [{"role": m["role"], "content": m["content"]} for m in new_msg_history]
+                    "messages": [
+                        {"role": m["role"], "content": m["content"]}
+                        for m in new_msg_history
+                    ],
                 },
                 "parameters": {
                     "temperature": temperature,
                     "max_new_tokens": MAX_NUM_TOKENS,
-                    "return_full_text": False
-                }
+                    "return_full_text": False,
+                },
             }
             response = requests.post(
                 "https://api-inference.huggingface.co/models/agentica-org/DeepCoder-14B-Preview",
                 headers=headers,
-                json=payload
+                json=payload,
             )
             if response.status_code == 200:
                 content = response.json()["generated_text"]
@@ -357,7 +371,7 @@ def get_response_from_llm(
         )
         content = response.choices[0].message.content
         new_msg_history = new_msg_history + [{"role": "assistant", "content": content}]
-    elif 'gemini' in model:
+    elif "gemini" in model:
         new_msg_history = msg_history + [{"role": "user", "content": msg}]
         response = client.chat.completions.create(
             model=model,
@@ -378,7 +392,7 @@ def get_response_from_llm(
         print()
         print("*" * 20 + " LLM START " + "*" * 20)
         for j, msg in enumerate(new_msg_history):
-            print(f'{j}, {msg["role"]}: {msg["content"]}')
+            print(f"{j}, {msg['role']}: {msg['content']}")
         print(content)
         print("*" * 21 + " LLM END " + "*" * 21)
         print()
@@ -396,6 +410,9 @@ def extract_json_between_markers(llm_output: str) -> dict | None:
         json_pattern = r"\{.*?\}"
         matches = re.findall(json_pattern, llm_output, re.DOTALL)
 
+    print(
+        f"Found {len(matches)} potential JSON matches in LLM output, matches[0]: {matches[0] if matches else 'None'}"
+    )
     for json_string in matches:
         json_string = json_string.strip()
         try:
@@ -462,7 +479,7 @@ def create_client(model) -> tuple[Any, str]:
             ),
             "meta-llama/llama-3.1-405b-instruct",
         )
-    elif 'gemini' in model:
+    elif "gemini" in model:
         print(f"Using OpenAI API with {model}.")
         return (
             openai.OpenAI(

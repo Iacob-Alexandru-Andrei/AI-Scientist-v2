@@ -7,6 +7,7 @@ look at a few high-level categories and normalise the "Overall" field onto the
 same 1–4 scale as the others.  The resulting float is used by the search code
 to rank paper versions.
 """
+
 from __future__ import annotations
 from statistics import mean
 from typing import Sequence, Dict, Any
@@ -20,12 +21,16 @@ DEFAULT_WEIGHTS = {
 }
 
 
-def score_single(review_json: Dict[str, Any], weights: Dict[str, int] | None = None) -> float:
+def score_single(
+    review_json: Dict[str, Any], weights: Dict[str, int] | None = None
+) -> float:
     """Weighted average of key fields (1-10 scaled to 1-4 where needed)."""
     if weights is None:
         weights = DEFAULT_WEIGHTS
     total, denom = 0.0, 0.0  # running numerator/denominator for the average
     for k, w in weights.items():
+        if review_json is None:
+            continue
         val = review_json.get(k)
         if val is None:
             continue

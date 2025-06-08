@@ -116,5 +116,7 @@ def improve_paper(
             page_limit=page_limit,
         )
     # Return the path to the best version for further inspection
-    logger.info("Best improved paper saved at %s", best_state.latex_dir)
+    logger.info(
+        "Best improved paper saved at %s %s", best_state.latex_dir, best_state.pdf_path
+    )
     return best_state

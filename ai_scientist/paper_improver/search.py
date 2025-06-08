@@ -71,7 +71,7 @@ def safe_evaluate(node: "PaperNode") -> float | None:
 
 # Default model used to pick the best node once search has finished.  It takes
 # a list of candidates and returns the selected node ID with some reasoning.
-ORCHESTRATOR_MODEL = "gpt-4o-2024-11-20"
+ORCHESTRATOR_MODEL = "gemini-2.5-flash-preview-04-17"
 
 # Function specification describing the JSON schema for orchestrator output.
 node_selection_spec = FunctionSpec(
@@ -105,6 +105,7 @@ class PaperNode:
         llm_model: str = DEFAULT_MODEL,
         vlm_model: str = VLM_MODEL,
         debug_depth: int = 0,
+        batch_review_cnt: int = 2,
     ):
         self.id = uuid.uuid4().hex
         self.latex_dir = latex_dir
@@ -134,6 +135,7 @@ class PaperNode:
             self.compile()
         # Run LLM and VLM reviews then compute an aggregate numeric score.
         self.llm_json = llm_review(str(self.pdf_path), model=self.llm_model)
+        # self.llm_json_2 = llm_review(str(self.pdf_path), model=self.llm_model)
         self.vlm_json = vlm_review(str(self.pdf_path), model=self.vlm_model)
         self.score = meta_score([self.llm_json, self.vlm_json])
         # Persist results for analysis
@@ -243,7 +245,7 @@ def breadth_first_improve(
         state = frontier.popleft()
         logger.info("Evaluating depth=%s dir=%s", state.depth, state.latex_dir)
         score = state.score if state is root else safe_evaluate(state)
-        if score > best_state.score:
+        if score and best_state.score and score > best_state.score:
             best_state = state
             logger.info("[NEW BEST] score=%.3f at %s", score, state.latex_dir)
         if state.depth >= p.max_depth:

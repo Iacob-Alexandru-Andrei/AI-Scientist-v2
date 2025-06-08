@@ -15,7 +15,7 @@ from ai_scientist.utils.token_tracker import track_token_usage
 EDITOR_MODEL = "o1-preview-2024-09-12"
 
 
-@track_token_usage
+# @track_token_usage
 def propose_edit(
     latex_path: Path,
     seed_ideas: str,

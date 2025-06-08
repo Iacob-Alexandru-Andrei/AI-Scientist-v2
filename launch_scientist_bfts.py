@@ -270,7 +270,7 @@ if __name__ == "__main__":
             small_model=args.model_citation,
         )
         for attempt in range(args.writeup_retries):
-            print(f"Writeup attempt {attempt+1} of {args.writeup_retries}")
+            print(f"Writeup attempt {attempt + 1} of {args.writeup_retries}")
             if args.writeup_type == "normal":
                 writeup_success = perform_writeup(
                     base_folder=idea_dir,

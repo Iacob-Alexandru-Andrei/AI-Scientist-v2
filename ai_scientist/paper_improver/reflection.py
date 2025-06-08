@@ -6,6 +6,7 @@ of these tools is provided to an editing model which returns an updated LaTeX
 snippet.  The loop terminates early if no changes are made or if the page limit
 is exceeded.
 """
+
 from __future__ import annotations
 
 import logging
@@ -51,7 +52,7 @@ def reflect_paper(
 
     for i in range(num_rounds):
         # Compile the current LaTeX source to PDF for analysis
-        pdf_path = latex_dir / f"reflection_{i+1}.pdf"
+        pdf_path = latex_dir / f"reflection_{i + 1}.pdf"
         compile_latex(str(latex_dir), str(pdf_path))
 
         try:
@@ -98,7 +99,9 @@ def reflect_paper(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
         )
-        code = re.search(r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL)
+        code = re.search(
+            r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL
+        )
         if not code:
             break
         new_src = textwrap.dedent(code.group(1)).strip()
@@ -110,4 +113,3 @@ def reflect_paper(
 
     # Finally compile once more so the directory contains the latest PDF
     compile_latex(str(latex_dir), str(latex_dir / "template.pdf"))
-

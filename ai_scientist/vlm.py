@@ -35,7 +35,7 @@ def encode_image_to_base64(image_path: str) -> str:
     return base64.b64encode(image_bytes).decode("utf-8")
 
 
-@track_token_usage
+# @track_token_usage
 def make_llm_call(client, model, temperature, system_message, prompt):
     if "gpt" in model:
         return client.chat.completions.create(
@@ -65,7 +65,7 @@ def make_llm_call(client, model, temperature, system_message, prompt):
         raise ValueError(f"Model {model} not supported.")
 
 
-@track_token_usage
+# @track_token_usage
 def make_vlm_call(client, model, temperature, system_message, prompt):
     if "gpt" in model:
         return client.chat.completions.create(
@@ -147,7 +147,7 @@ def get_response_from_vlm(
         print()
         print("*" * 20 + " VLM START " + "*" * 20)
         for j, msg in enumerate(new_msg_history):
-            print(f'{j}, {msg["role"]}: {msg["content"]}')
+            print(f"{j}, {msg['role']}: {msg['content']}")
         print(content)
         print("*" * 21 + " VLM END " + "*" * 21)
         print()
@@ -290,7 +290,7 @@ def get_batch_responses_from_vlm(
         print()
         print("*" * 20 + " VLM START " + "*" * 20)
         for j, msg in enumerate(new_msg_histories[0]):
-            print(f'{j}, {msg["role"]}: {msg["content"]}')
+            print(f"{j}, {msg['role']}: {msg['content']}")
         print(contents[0])
         print("*" * 21 + " VLM END " + "*" * 21)
         print()

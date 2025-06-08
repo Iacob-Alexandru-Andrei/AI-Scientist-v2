@@ -1,0 +1,445 @@
+File "/Users/iacobalexandru/projects/AI-Scientist-v2/launch_paper_improver.py", line 105, in <module>
+    improve_paper(
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/pipeline.py", line 85, in improve_paper
+    best_state, _journal = breadth_first_improve(
+                           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/search.py", line 216, in breadth_first_improve
+    safe_evaluate(root)
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/search.py", line 63, in safe_evaluate
+    return node.evaluate()
+           ^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/search.py", line 139, in evaluate
+    self.score = meta_score([self.llm_json, self.llm_json_2])
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/meta_review.py", line 42, in meta_score
+    return mean(score_single(r) for r in reviews) if reviews else 0.0
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/.local/share/uv/python/cpython-3.12.10-macos-aarch64-none/lib/python3.12/statistics.py", line 484, in mean
+    T, total, n = _sum(data)
+                  ^^^^^^^^^^
+  File "/Users/iacobalexandru/.local/share/uv/python/cpython-3.12.10-macos-aarch64-none/lib/python3.12/statistics.py", line 191, in _sum
+    for typ, values in groupby(data, type):
+                       ^^^^^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/meta_review.py", line 42, in <genexpr>
+    return mean(score_single(r) for r in reviews) if reviews else 0.0
+                ^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/meta_review.py", line 29, in score_single
+    val = review_json.get(k)
+          ^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'
+iacobalexandru@user-117-12 AI-Scientist-v2 % uv run python launch_paper_improver.py examples/paper_improver_minimal \
+    examples/paper_improver_minimal/seed_ideas.json \
+    --human-reviews examples/paper_improver_minimal/human_reviews.txt \
+    --max-depth 1 --beam-size 1 --num-drafts 1 \
+    --debug-prob 0.5 --max-debug-depth 3 \
+    --model-editor gemini-2.5-flash-preview-04-17 \
+    --model-review gemini-2.5-flash-preview-04-17 \
+    --model-vlm gemini-2.5-flash-preview-04-17 \
+    --model-orchestrator gemini-2.5-flash-preview-04-17 \
+    --model-citation gemini-2.5-flash-preview-04-17 --num-cite-rounds 20 \
+    --model-reflection gemini-2.5-flash-preview-04-17 --num-reflections 1 --page-limit 4
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+    "Summary": "This paper proposes Automated Relational Meta-Learning (ARML), a novel framework designed to handle task heterogeneity in meta-learning. The core idea is to automatically extract and leverage relationships across tasks by constructing a meta-knowledge graph (MKG). For each task, a prototype-based relational graph is built, which then interacts with the learned MKG within a super-graph structure via a Graph Neural Network (GNN). The enriched task representation is used to modulate the meta-learner's initialization. The framework is evaluated on 2D regression and few-shot image classification datasets, including a new benchmark designed with image filters to increase heterogeneity, demonstrating state-of-the-art performance compared to various baselines and providing some analysis of the learned MKG.",
+    "Strengths": [
+        "The paper addresses the important problem of task heterogeneity in meta-learning, which is a critical challenge for applying meta-learning in realistic scenarios.",
+        "The proposed meta-knowledge graph architecture is novel and offers a flexible way to model complex relationships among diverse tasks.",
+        "The idea of using prototype-based graphs for individual tasks and connecting them to a global meta-knowledge graph via a super-graph and GNN is interesting and technically sound.",
+        "The experimental evaluation is comprehensive, covering different meta-learning settings and introducing a challenging heterogeneous dataset (Art-Multi) which better highlights the problem being addressed.",
+        "Ablation studies provide evidence for the contribution of key components like the meta-knowledge graph and the prototype-based structure."
+    ],
+    "Weaknesses": [
+        "The clarity of some technical components could be improved, particularly the details of the autoencoder aggregators used for constructing task representations qi and ti (Equations 8 & 9). While GRUs are mentioned in the appendix, the architectural details and how they process the sets of prototypes are not fully clear in the main text.",
+        "The description of the GNN used on the super-graph is very brief (stated as \"one layer GCN\"). More details on the specific message passing formulation and aggregation would enhance clarity.",
+        "While ablation studies are provided, further analysis could strengthen the paper, such as ablating different configurations or architectures for the modulation function (beyond just the activation) and exploring alternative aggregator designs.",
+        "The interpretability analysis, while a good effort, remains somewhat speculative. Providing a more rigorous justification for the interpretations of the meta-knowledge graph vertices would be beneficial.",
+        "The computational complexity of the proposed method, especially concerning the super-graph construction and GNN propagation for each task during training, is not explicitly discussed or compared to baselines."
+    ],
+    "Originality": 3,
+    "Quality": 3,
+    "Clarity": 3,
+    "Significance": 4,
+    "Questions": [
+        "Could the authors provide more detailed architectural specifications for the autoencoder aggregators (AGq, AGq_dec, AGt, AGt_dec), including how they handle the set of prototypes?",
+        "Please provide more details on the specific GNN implementation used in Equation 7, including the message passing and aggregation functions.",
+        "Could the authors perform additional ablation studies, perhaps exploring different ways of implementing the modulation function (e.g., gating parameters per layer or per filter) or different types of aggregators for task representation?",
+        "Can the authors provide a more detailed analysis or stronger evidence to support the interpretations of the meta-knowledge graph vertices and edges?",
+        "Can the authors comment on the computational complexity and training time of ARML compared to prominent baselines, especially given the super-graph construction and GNN steps?"
+    ],
+    "Limitations": [
+        "The authors acknowledge the sensitivity to the number of vertices in the meta-knowledge graph, suggesting more vertices might be needed for more complex datasets. This highlights a potential hyperparameter tuning challenge.",
+        "The complexity of the model might make it harder to scale or train compared to simpler meta-learning approaches, although this is not explicitly discussed.",
+        "The interpretability claims, while interesting, are not rigorously validated and rely on plausible explanations of visualized structures."
+    ],
+    "Ethical Concerns": false,
+    "Soundness": 3,
+    "Presentation": 3,
+    "Contribution": 3,
+    "Overall": 7,
+    "Confidence": 4,
+    "Decision": "Accept"
+}
+
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+INFO:ai_scientist.paper_improver.search:Evaluating depth=0 dir=/Users/iacobalexandru/projects/AI-Scientist-v2/examples/paper_improver_minimal
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+INFO:ai_scientist.paper_improver.search:Evaluating depth=1 dir=/Users/iacobalexandru/projects/AI-Scientist-v2/examples/draft_0fa1d69d
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+INFO:ai_scientist.paper_improver.search:Evaluating depth=1 dir=/Users/iacobalexandru/projects/AI-Scientist-v2/examples/d0_93c8a951
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 0 potential JSON matches in LLM output, matches[0]: None
+ERROR:ai_scientist.paper_improver.search:Orchestrator selection failed: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable
+INFO:ai_scientist.paper_improver.pipeline:Gathering citations with gemini-2.5-flash-preview-04-17 for 20 rounds
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that provides a general overview of challenges, pitfalls, or limitations encountered when applying deep learning, particularly in real-world scenarios. This will serve as foundational context for the paper's topic.",
+  "Query": "challenges in deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 103654, "offset": 0, "next": 5, "data": [{"paperId": "0084f3cb0a1754272151c5268a783f24bf5676a0", "title": "Review of deep learning: concepts, CNN architectures, challenges, applications, future directions", "venue": "Journal of Big Data", "year": 2021, "citationCount": 4617, "openAccessPdf": {"url": "https://journalofbigdata.springeropen.com/counter/pdf/10.1186/s40537-021-00444-8", "status": "GOLD", "license": "CCBY", "disclaimer": "Notice: This content is from the open access paper or
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [0],
+  "Description": "Cite 'Review of deep learning: concepts, CNN architectures, challenges, applications, future directions' (Alzubaidi et al., 2021) as a foundational reference providing a broad overview of deep learning concepts, architectures, and importantly, a section dedicated to challenges and future directions. This paper can be cited in the introduction or background section to frame the overall topic of the paper on deep learning pitfalls and challenges."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the challenges related to data in deep learning, such as data scarcity, data quality (noise, bias), and data distribution shifts. This paper can be used to support arguments about data-related pitfalls.",
+  "Query": "data challenges deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 508888, "offset": 0, "next": 5, "data": [{"paperId": "0084f3cb0a1754272151c5268a783f24bf5676a0", "title": "Review of deep learning: concepts, CNN architectures, challenges, applications, future directions", "venue": "Journal of Big Data", "year": 2021, "citationCount": 4617, "openAccessPdf": {"url": "https://journalofbigdata.springeropen.com/counter/pdf/10.1186/s40537-021-00444-8", "status": "GOLD", "license": "CCBY", "disclaimer": "Notice: This content is from the open access paper or
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [2],
+  "Description": "Cite 'A survey on deep learning tools dealing with data scarcity: definitions, challenges, solutions, tips, and applications' (Alzubaidi et al., 2023) as a key reference discussing data-related challenges, specifically focusing on data scarcity. This paper provides definitions, outlines challenges, and surveys solutions, making it highly relevant for discussing the pitfalls associated with insufficient or limited data in deep learning. It can be cited in sections discussing data requirements, data collection challenges, or limitations due to small datasets."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a foundational or survey paper on adversarial attacks and defenses in deep learning. This is crucial for discussing model robustness challenges and how they impact the reliability and safety of deep learning systems in real-world applications.",
+  "Query": "adversarial attacks deep learning survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 6865, "offset": 0, "next": 5, "data": [{"paperId": "b514949ad8344071c0f342f182390d2d88bcc26d", "title": "Threat of Adversarial Attacks on Deep Learning in Computer Vision: A Survey", "venue": "IEEE Access", "year": 2018, "citationCount": 1861, "openAccessPdf": {"url": "https://doi.org/10.1109/access.2018.2807385", "status": "GOLD", "license": "CCBYNCND", "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/1801.00553, which is
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'How Deep Learning Sees the World: A Survey on Adversarial Attacks & Defenses' (Costa et al., 2023) as a comprehensive and recent survey on adversarial attacks and defenses in deep learning. This paper is highly relevant for discussing model robustness as a significant real-world pitfall. It covers various attacks and defenses, discusses their implications for critical applications (like self-driving cars, healthcare), and includes recent architectures like Vision Transformers. This can be cited in sections discussing model security, reliability, and the challenges of deploying deep learning in safety-critical domains."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that provides a comprehensive overview or survey of challenges related to deep learning interpretability and explainability. This is needed to discuss the 'black box' nature of deep learning models as a significant real-world pitfall, especially in applications requiring transparency and trust.",
+  "Query": "deep learning interpretability survey challenges"
+}
+
+Response Status Code: 200
+Response Content: {"total": 13761, "offset": 0, "next": 5, "data": [{"paperId": "142961786632e880c05e0b72097427553568e282", "title": "A Survey of Deep Learning and Foundation Models for Time Series Forecasting", "venue": "arXiv.org", "year": 2024, "citationCount": 20, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2401.13912, which is subject to the license by the author or copyright own
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'A survey on the interpretability of deep learning in medical diagnosis' (Teng et al., 2022) as a relevant reference discussing the 'black-box' nature of deep learning models as a significant real-world pitfall, particularly in critical applications like medical diagnosis. This paper provides a survey of interpretability methods, discusses applications, but importantly, highlights the challenges of interpretability and future research directions, directly supporting arguments about the lack of transparency hindering adoption and trust. It can be cited in sections discussing model interpretability, trust, and deployment challenges in sensitive domains."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the challenges and pitfalls related to bias, fairness, and ethical considerations in deep learning models. This is crucial for highlighting the societal impact of deep learning failures and supporting arguments about the need for responsible AI development. It can be cited in sections discussing ethical implications, fairness, and societal challenges.",
+  "Query": "bias fairness ethics challenges deep learning survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 867, "offset": 0, "next": 5, "data": [{"paperId": "7cdcba89c1e7e76ca9c19370298a013ff519bc62", "title": "Challenges in Reducing Bias Using Post-Processing Fairness for Breast Cancer Stage Classification with Deep Learning", "venue": "Algorithms", "year": 2024, "citationCount": 3, "openAccessPdf": {"url": "https://www.mdpi.com/1999-4893/17/4/141/pdf?version=1711639627", "status": "GOLD", "license": "CCBY", "disclaimer": "Notice: This content is from the open access paper or abstract avai
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'A Survey on Bias and Fairness in Machine Learning' (Mehrabi et al., 2019) as a foundational reference discussing the significant real-world pitfalls related to bias, fairness, and ethical considerations in machine learning, including deep learning. This comprehensive survey provides definitions of fairness, identifies sources of bias, surveys real-world applications demonstrating bias, and discusses mitigation techniques. It is essential for framing the discussion on the societal impact of deep learning failures and the importance of responsible AI development. This can be cited in sections discussing ethical implications, fairness, societal challenges, or limitations of deep learning models in sensitive applications."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the fundamental technical challenges in training deep neural networks, such as vanishing/exploding gradients, difficulties with optimization landscapes (saddle points, local minima), convergence issues, and the complexity of hyperparameter tuning. This paper will support discussions on the technical hurdles faced during model development and training.",
+  "Query": "challenges training deep neural networks optimization"
+}
+
+Response Status Code: 200
+Response Content: {"total": 197598, "offset": 0, "next": 5, "data": [{"paperId": "20b83f259c91cb2462b7f22d99c5410380ae111c", "title": "A Fast ADMM Framework for Training Deep Neural Networks Without Gradients", "venue": "IEEE International Joint Conference on Neural Network", "year": 2024, "citationCount": 2, "openAccessPdf": {"url": "", "status": "CLOSED", "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://api.unpaywall.org/v2/10.1109/IJCNN60899.20
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'Stabilizing the training of deep neural networks using Adam optimization and gradient clipping' (Tiwari, 2023) as a relevant reference discussing the technical challenges in training deep neural networks, particularly focusing on difficulties like learning long-term dependencies (related to vanishing gradients) and the role of optimization techniques like Adam and gradient clipping in addressing these issues and stabilizing training. This paper can be cited in sections discussing the technical hurdles during model development, training stability, and the importance of appropriate optimization methods."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the significant computational cost, hardware requirements, and energy consumption associated with training and deploying large deep learning models. This is a major practical pitfall impacting accessibility, scalability, and environmental sustainability.",
+  "Query": "computational cost energy consumption deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 36758, "offset": 0, "next": 5, "data": [{"paperId": "1d40ea66075419058f8153c4598e418f5d04b054", "title": "Computational Offloading in Mobile Edge with Comprehensive and Energy Efficient Cost Function: A Deep Learning Approach", "venue": "Italian National Conference on Sensors", "year": 2021, "citationCount": 13, "openAccessPdf": {"url": "https://www.mdpi.com/1424-8220/21/10/3523/pdf?version=1621850945", "status": "GOLD", "license": "CCBY", "disclaimer": "Notice: This content is from th
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [3],
+  "Description": "Cite 'Energy and Policy Considerations for Deep Learning in NLP' (Strubell et al., 2019) as a foundational reference highlighting the significant computational cost, hardware requirements, and energy consumption associated with training and deploying large deep learning models, particularly in NLP. This paper quantifies the environmental and financial costs, making it crucial for discussing the practical pitfalls related to resource intensity, accessibility, scalability, and sustainability. It can be cited in sections discussing infrastructure challenges, environmental impact, or the economic barriers to large-scale deep learning research and deployment."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the practical challenges of deploying and maintaining deep learning models in production environments, including issues like model degradation over time (data drift, concept drift), monitoring, versioning, and MLOps challenges. This is important for highlighting the real-world pitfalls beyond initial training and evaluation.",
+  "Query": "challenges deploying deep learning production mlops data drift concept drift"
+}
+
+Response Status Code: 200
+Response Content: {"total": 38, "offset": 0, "next": 5, "data": [{"paperId": "2d495b1929a236708b82988d1b44ca17d9a93e95", "title": "Unsupervised Concept Drift Detection from Deep Learning Representations in Real-time", "venue": "arXiv.org", "year": 2024, "citationCount": 1, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2406.17813, which is subject to the license by the author or copyrigh
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'Understanding Data Drift and Concept Drift in Machine Learning Systems' (Mannapur, 2025) as a relevant reference discussing critical challenges in deploying and maintaining machine learning systems, specifically focusing on data drift and concept drift. This paper examines how these phenomena degrade model performance in production, explores types of drift, and analyzes detection and mitigation strategies. It is highly relevant for discussing the real-world pitfalls associated with the operational lifecycle of deep learning models beyond initial development, including the need for continuous monitoring and maintenance. This can be cited in sections discussing deployment challenges, model degradation, monitoring, and the practical difficulties of maintaining performance over time."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the challenges and complexities associated with hyperparameter tuning in deep learning. This is a significant practical pitfall during model development, impacting performance and resource usage. The paper should ideally survey methods but also highlight the difficulties involved.",
+  "Query": "challenges of hyperparameter tuning deep learning survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 877, "offset": 0, "next": 5, "data": [{"paperId": "799f6aa3f3cb677bf618c0815aa3149c341495b8", "title": "Multi-objective Deep Learning: Taxonomy and Survey of the State of the Art", "venue": "arXiv.org", "year": 2024, "citationCount": 2, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2412.01566, which is subject to the license by the author or copyright owner p
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Do not add any.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite the original paper introducing the Adam optimizer. This is important because Adam is a widely used optimization algorithm in deep learning, and citing its foundational paper is necessary when discussing training challenges or mentioning the use of this specific method.",
+  "Query": "Adam: A Method for Stochastic Optimization"
+}
+
+Response Status Code: 200
+Response Content: {"total": 5653, "offset": 0, "next": 5, "data": [{"paperId": "a6cb366736791bcccc5c8639de5a8f9636bf87e8", "title": "Adam: A Method for Stochastic Optimization", "venue": "International Conference on Learning Representations", "year": 2014, "citationCount": 149688, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/1412.6980, which is subject to the license by the author or c
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [0],
+  "Description": "Cite the original paper introducing the Adam optimizer ('Adam: A Method for Stochastic Optimization' by Kingma and Ba, 2014). Adam is a widely used adaptive learning rate optimization algorithm in deep learning, known for its effectiveness but also sometimes associated with generalization issues compared to SGD. Citing this paper is essential when discussing the training process, optimization challenges, or mentioning the specific use of Adam as an optimization method in the paper's experimental setup or related work on training stability."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "A paper discussing the challenges and issues related to reproducibility in deep learning research and practice. This is a significant pitfall that affects research validity and practical deployment.",
+  "Query": "reproducibility challenges deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 112674, "offset": 0, "next": 5, "data": [{"paperId": "3ac44179833f3b5154cbd82192aa5d5d153c1c5a", "title": "Checklist for Reproducibility of Deep Learning in Medical Imaging", "venue": "Journal of imaging informatics in medicine", "year": 2024, "citationCount": 4, "openAccessPdf": {"url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11300409", "status": "GREEN", "license": "CCBY", "disclaimer": "Notice: This content is from the open access paper or abstract available at https://pmc.ncb
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [2, 3],
+  "Description": "Cite 'On the Reproducibility and Replicability of Deep Learning in Software Engineering' (Liu et al., 2022) and 'Reproducibility of deep learning in digital pathology whole slide image analysis' (Fell et al., 2022) as key references highlighting the significant challenges related to reproducibility and replicability in deep learning research and practice. Liu et al. provide a general discussion on the topic, while Fell et al. offer a case study in digital pathology, demonstrating practical difficulties encountered when trying to reproduce published results due to missing details in reporting. These papers are crucial for discussing the pitfall of non-reproducible results, which impacts the reliability and trustworthiness of deep learning research and applications. They can be cited in sections discussing research methodology challenges, the importance of detailed reporting, or the practical difficulties in verifying and building upon existing deep learning work."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "A foundational reference discussing the crucial challenge of overfitting in deep learning models and common techniques used to improve generalization, such as regularization methods (L1/L2, dropout), early stopping, or data augmentation. This is a fundamental pitfall in deep learning, especially with complex models and finite datasets, and needs to be explicitly addressed.",
+  "Query": "deep learning overfitting generalization regularization survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 4329, "offset": 0, "next": 5, "data": [{"paperId": "8929bb5e372fe36b85664fca0e6649a6f4dd2e49", "title": "A Survey Analyzing Generalization in Deep Reinforcement Learning", "venue": "arXiv.org", "year": 2024, "citationCount": 3, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2401.02349, which is subject to the license by the author or copyright owner provided w
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1, 3],
+  "Description": "Cite 'Understanding Surprising Generalization Phenomena in Deep Learning' (Hu, 2024) and 'Image data augmentation techniques based on deep learning: A survey' (Zeng, 2024) as key references discussing the crucial challenge of overfitting and generalization in deep learning. Hu (2024) provides a theoretical perspective, examining phenomena like implicit regularization and benign overfitting that challenge classical understanding. Zeng (2024) surveys practical image data augmentation techniques used to improve generalization and mitigate overfitting, especially in data-limited scenarios. These papers are essential for discussing the fundamental pitfall of poor generalization and practical methods used to address it. They can be cited in sections discussing model training challenges, generalization issues, data limitations, and mitigation techniques like regularization or data augmentation."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the practical engineering challenges, MLOps pitfalls, and infrastructure complexities involved in deploying and maintaining deep learning systems in real-world scenarios. This addresses challenges beyond model training, focusing on the operational lifecycle.",
+  "Query": "real world deep learning engineering challenges MLOps pitfalls"
+}
+
+Response Status Code: 200
+Response Content: {"total": 586, "offset": 0, "next": 5, "data": [{"paperId": "f0ef4436bc51d863183a62b8e0850787fea2d16b", "title": "Deep Learning Inference on Heterogeneous Mobile Processors: Potentials and Pitfalls", "venue": "AdaAIoTSys@MobiSys", "year": 2024, "citationCount": 1, "openAccessPdf": {"url": "https://dl.acm.org/doi/pdf/10.1145/3662007.3663881", "status": "BRONZE", "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2405.0
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [1],
+  "Description": "Cite 'TabReD: Analyzing Pitfalls and Filling the Gaps in Tabular Deep Learning Benchmarks' (Rubachev et al., 2024) as a relevant reference discussing real-world challenges related to data distribution shifts (data and concept drift) and the limitations of current academic benchmarks in evaluating deep learning models under such conditions. This paper highlights how methods performing well on static benchmarks might fail in dynamic real-world environments, addressing a key operational pitfall. It can be cited in sections discussing deployment challenges, model degradation over time, data drift, and the gap between research and real-world performance."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that discusses the challenges related to deploying, monitoring, and maintaining deep learning models in production environments. This addresses the practical pitfalls beyond initial training, focusing on MLOps challenges, performance monitoring, and ensuring reliability over time.",
+  "Query": "challenges deploying monitoring deep learning production mlops survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 199, "offset": 0, "next": 5, "data": [{"paperId": "525380fc2499c405d8a636bb1e8f3b4d102424e4", "title": "A Technical Survey on Deep Learning and AI Solutions for Plant Quality and Health Indicators Monitoring in Agriculture", "venue": "2022 3rd International Conference on Smart Electronics and Communication (ICOSEC)", "year": 2022, "citationCount": 7, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstra
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [4],
+  "Description": "Cite 'Key Challenges and Limitations of MLOps in Context of Machine Learning' (Sribhashyam, 2025) as a relevant reference discussing the practical challenges and limitations of deploying, monitoring, and maintaining machine learning models, including deep learning, in production environments. This paper covers the MLOps lifecycle, key components like monitoring and data versioning, and specifically addresses obstacles such as scalability and data management, which are critical real-world pitfalls beyond initial model training. It can be cited in sections discussing deployment challenges, operational difficulties, the gap between research and production, and the need for robust MLOps practices."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper that specifically discusses the challenges, difficulties, and pitfalls associated with hyperparameter tuning in deep learning models. This is a significant practical hurdle in achieving optimal performance and efficiency.",
+  "Query": "challenges hyperparameter tuning deep learning survey pitfalls"
+}
+
+Response Status Code: 200
+Response Content: {"total": 910, "offset": 0, "next": 5, "data": [{"paperId": "4ac1db6055527915194acd0933d46a910564c442", "title": "I Choose You: Automated Hyperparameter Tuning for Deep Learning-Based Side-Channel Analysis", "venue": "IEEE Transactions on Emerging Topics in Computing", "year": 2024, "citationCount": 94, "openAccessPdf": {"url": "", "status": "CLOSED", "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://api.unpaywall.org/v2/10.1109/T
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [],
+  "Description": "None of the search results specifically focus on the challenges and pitfalls *of* hyperparameter tuning itself as a significant hurdle in deep learning, but rather discuss methods for automated tuning or apply tuning in specific domains. A citation is still needed that addresses the inherent difficulties, computational cost, and expertise required for effective hyperparameter tuning."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the significant human effort, engineering complexity, and hidden costs associated with building, deploying, and maintaining deep learning systems, beyond just computational resources. This is relevant for discussing the practical pitfalls of operationalizing deep learning.",
+  "Query": "deep learning engineering complexity cost technical debt challenges"
+}
+
+Response Status Code: 200
+Response Content: {"total": 258, "offset": 0, "next": 5, "data": [{"paperId": "732262a70950ecebb0cd52edc9a465f85ab6d7e1", "title": "Large language model ChatGPT versus small deep learning models for self\u2010admitted technical debt detection: Why not together?", "venue": "Software, Practice & Experience", "year": 2024, "citationCount": 6, "openAccessPdf": {"url": "", "status": "CLOSED", "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://api.unpaywa
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Do not add any.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the practical engineering challenges of deploying deep learning models, including issues related to inference speed, memory constraints (especially on edge devices), model versioning, and the difficulty of debugging complex production systems. This supports arguments about the real-world pitfalls beyond theoretical training challenges.",
+  "Query": "practical challenges deep learning deployment inference edge debugging"
+}
+
+Response Status Code: 200
+Response Content: {"total": 580, "offset": 0, "next": 5, "data": [{"paperId": "f5a157d6b5ef58d9d20bf5a14ee2b074b38c6a97", "title": "Microservice Deployment for Satellite Edge AI Inference via Deep Reinforcement Learning", "venue": "IEEE International Symposium on Personal, Indoor and Mobile Radio Communications", "year": 2024, "citationCount": 1, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://api.unpa
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [3, 4],
+  "Description": "Cite 'FaceLite: A Real-Time Light-Weight Facemask Detection Using Deep Learning: A Comprehensive Analysis, Opportunities, and Challenges for Edge Computing' (Paul, 2024) and 'Research on Deep Learning Model and Optimization Algorithm in Edge Computing' (Liu et al., 2023) as relevant references discussing the practical engineering challenges of deploying deep learning models, particularly on resource-constrained edge devices. Paul (2024) highlights difficulties related to memory and computing resources for real-time inference, while Liu et al. (2023) study optimization techniques like pruning and quantization to address the contradiction between algorithm requirements and limited edge computing power to meet real-time demands. These papers support arguments about real-world pitfalls beyond theoretical training challenges, including inference speed and memory constraints.",
+  "Query": "practical challenges deep learning deployment inference edge debugging"
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the challenges and pitfalls of hyperparameter tuning and model selection in deep learning. This includes the computational cost, the vast search space, the difficulty in finding optimal configurations, and the impact on model performance and stability. This paper would support arguments about the practical difficulties in developing and deploying deep learning models.",
+  "Query": "challenges hyperparameter tuning deep learning survey"
+}
+
+Response Status Code: 200
+Response Content: {"total": 15886, "offset": 0, "next": 5, "data": [{"paperId": "799f6aa3f3cb677bf618c0815aa3149c341495b8", "title": "Multi-objective Deep Learning: Taxonomy and Survey of the State of the Art", "venue": "arXiv.org", "year": 2024, "citationCount": 2, "openAccessPdf": {"url": "", "status": null, "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://arxiv.org/abs/2412.01566, which is subject to the license by the author or copyright owner
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [0],
+  "Description": "Cite 'Multi-objective Deep Learning: Taxonomy and Survey of the State of the Art' (Peitz and Hotegni, 2024) as a relevant reference discussing the challenges of optimization in deep learning, which implicitly includes the difficulty of hyperparameter tuning. The paper highlights the added complexity due to the large number of parameters, strong nonlinearities, and stochasticity inherent in deep learning models, which makes finding optimal configurations challenging and computationally expensive. This supports arguments about the practical difficulties in developing and deploying deep learning models, specifically concerning the tuning process. It can be cited in sections discussing model development challenges, computational costs, or the practical hurdles in achieving optimal performance."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the practical challenges and complexity of hyperparameter optimization in deep learning. This is a significant real-world pitfall during model development due to the large number of hyperparameters, their interactions, and the computational cost of evaluation. The paper should cover why tuning is difficult and potentially discuss methods or the limitations of current tuning approaches.",
+  "Query": "challenges of hyperparameter optimization in deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 968, "offset": 0, "next": 5, "data": [{"paperId": "4ac1db6055527915194acd0933d46a910564c442", "title": "I Choose You: Automated Hyperparameter Tuning for Deep Learning-Based Side-Channel Analysis", "venue": "IEEE Transactions on Emerging Topics in Computing", "year": 2024, "citationCount": 94, "openAccessPdf": {"url": "", "status": "CLOSED", "license": null, "disclaimer": "Notice: This content is from the open access paper or abstract available at https://api.unpaywall.org/v2/10.1109/T
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [2],
+  "Description": "Cite 'Genetic Algorithm Based Deep Learning Neural Network Structure and Hyperparameter Optimization' (Lee et al., 2021) as a relevant reference discussing the practical challenges and complexity of hyperparameter optimization in deep learning. This paper highlights that the performance of deep learning models greatly depends on hyperparameters and that selecting appropriate parameters is difficult and a significant research area, supporting the argument that hyperparameter tuning is a real-world pitfall during model development. It can be cited in sections discussing model development challenges, computational costs, or the practical hurdles in achieving optimal performance."
+}
+
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Description": "Cite a paper discussing the practical challenges, costs, and pitfalls associated with data labeling or annotation for deep learning, which is a significant bottleneck and source of potential issues (cost, time, errors, bias) in real-world applications, particularly for supervised learning.",
+  "Query": "challenges data labeling deep learning"
+}
+
+Response Status Code: 200
+Response Content: {"total": 87981, "offset": 0, "next": 5, "data": [{"paperId": "4a07ded5f56aa76c75e844f353e046414b427cc2", "title": "A survey on deep learning tools dealing with data scarcity: definitions, challenges, solutions, tips, and applications", "venue": "Journal of Big Data", "year": 2023, "citationCount": 416, "openAccessPdf": {"url": "https://journalofbigdata.springeropen.com/counter/pdf/10.1186/s40537-023-00727-2", "status": "GOLD", "license": "CCBY", "disclaimer": "Notice: This content is from the o
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/openai/chat/completions "HTTP/1.1 200 OK"
+Found 1 potential JSON matches in LLM output, matches[0]: 
+{
+  "Selected": [3],
+  "Description": "Cite 'Training Strategies for Radiology Deep Learning Models in Data-limited Scenarios' (Candemir et al., 2021) as a relevant reference discussing the practical challenges and pitfalls associated with data labeling, particularly in domains requiring expert knowledge like medical imaging. This paper highlights the tedious annotation processes and the limited availability of experts, which contribute to data scarcity and hinder model development, directly supporting arguments about data-related bottlenecks and costs in real-world deep learning applications. It can be cited in sections discussing data collection challenges, costs, or limitations due to annotation difficulties."
+}
+
+INFO:ai_scientist.paper_improver.pipeline:Running 1 reflection rounds with gemini-2.5-flash-preview-04-17
+Using OpenAI API with gemini-2.5-flash-preview-04-17.
+Traceback (most recent call last):
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/launch_paper_improver.py", line 105, in <module>
+    improve_paper(
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/pipeline.py", line 111, in improve_paper
+    reflect_paper(
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/paper_improver/reflection.py", line 49, in reflect_paper
+    vlm_client, vm = create_vlm_client(vlm_model)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/iacobalexandru/projects/AI-Scientist-v2/ai_scientist/vlm.py", line 170, in create_client
+    raise ValueError(f"Model {model} not supported.")
+ValueError: Model gemini-2.5-flash-preview-04-17 not supported.

@@ -5,6 +5,7 @@ This module simply exposes a thin convenience function ``llm_review`` that
 forwards the desired model name and any keyword arguments.  ``create_client``
 is used so the same code works for OpenAI, Gemini or Anthropic models.
 """
+
 from typing import Any
 from ai_scientist.perform_llm_review import perform_review  # existing util
 from ai_scientist.llm import create_client
@@ -31,5 +32,7 @@ def llm_review(
     # Delegate the actual reviewing logic to ``perform_review``.  We simply pass
     # through the client and model name so downstream code remains decoupled
     # from any particular LLM provider.
-    review_json = perform_review(tex_or_pdf_path, m, client, **kwargs)
+    review_json = perform_review(
+        tex_or_pdf_path, m, client, **kwargs, num_fs_examples=0
+    )
     return review_json
