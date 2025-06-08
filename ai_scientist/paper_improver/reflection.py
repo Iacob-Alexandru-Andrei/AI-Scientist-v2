@@ -94,11 +94,16 @@ def reflect_paper(
         )
 
         # Ask the LLM to produce an improved LaTeX snippet given the diagnostics
+        msg_history.append({"role": "user", "content": prompt})
         resp = client.chat.completions.create(
             model=m,
-            messages=[{"role": "user", "content": prompt}],
+            messages=msg_history,
             temperature=0.3,
         )
+        msg = resp.choices[0].message
+        role = getattr(msg, "role", "assistant")
+        content = getattr(msg, "content", "")
+        msg_history.append({"role": role, "content": content})
         code = re.search(
             r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL
         )
