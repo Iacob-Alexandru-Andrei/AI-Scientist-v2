@@ -32,7 +32,20 @@ from .writeup import perform_writeup
 logger = logging.getLogger(__name__)
 
 
-def _expand_and_score(args: Tuple[PaperNode, str, str | None, int, str, str, str, dict | None, dict | None, dict | None]):
+def _expand_and_score(
+    args: Tuple[
+        PaperNode,
+        str,
+        str | None,
+        int,
+        str,
+        str,
+        str,
+        dict | None,
+        dict | None,
+        dict | None,
+    ],
+):
     (
         node,
         seed_ideas,
@@ -50,11 +63,23 @@ def _expand_and_score(args: Tuple[PaperNode, str, str | None, int, str, str, str
         child_dir = unique_subdir(node.latex_dir.parent, f"d{node.depth}")
         shutil.copytree(node.latex_dir, child_dir)
         tex_path = child_dir / "template.tex"
-        new_source = propose_edit(tex_path, seed_ideas, human_reviews, model=model_editor)
+        new_source = propose_edit(
+            tex_path,
+            seed_ideas,
+            model_reviews=str(node.llm_json) + str(node.vlm_json),
+            human_reviews=human_reviews,
+            model=model_editor,
+        )
         tex_path.write_text(new_source)
         if writeup_params is not None:
             perform_writeup(child_dir, **writeup_params)
-        child = PaperNode(child_dir, node.depth + 1, parent=node, llm_model=model_review, vlm_model=model_vlm)
+        child = PaperNode(
+            child_dir,
+            node.depth + 1,
+            parent=node,
+            llm_model=model_review,
+            vlm_model=model_vlm,
+        )
         node.children.append(child)
         safe_evaluate(child, llm_kwargs=llm_kwargs, vlm_kwargs=vlm_kwargs)
         children.append(child)
@@ -71,7 +96,9 @@ def _get_leaves(node: PaperNode) -> List[PaperNode]:
     return leaves
 
 
-def _select_parallel_nodes(journal: Journal, params: SearchParams, num_workers: int) -> List[PaperNode | None]:
+def _select_parallel_nodes(
+    journal: Journal, params: SearchParams, num_workers: int
+) -> List[PaperNode | None]:
     """Mimic the clever node selection from the main project."""
     nodes_to_process: List[PaperNode | None] = []
     processed_trees: set[int] = set()
@@ -93,7 +120,9 @@ def _select_parallel_nodes(journal: Journal, params: SearchParams, num_workers: 
             debuggable = [
                 n
                 for n in journal.buggy_nodes
-                if n.is_buggy and n.children == [] and n.debug_depth <= params.max_debug_depth
+                if n.is_buggy
+                and n.children == []
+                and n.debug_depth <= params.max_debug_depth
             ]
             if debuggable:
                 node = random.choice(debuggable)
@@ -101,7 +130,9 @@ def _select_parallel_nodes(journal: Journal, params: SearchParams, num_workers: 
                 while tree_root.parent:
                     tree_root = tree_root.parent
                 tree_id = id(tree_root)
-                if tree_id not in processed_trees or len(processed_trees) >= len(viable_trees):
+                if tree_id not in processed_trees or len(processed_trees) >= len(
+                    viable_trees
+                ):
                     nodes_to_process.append(node)
                     processed_trees.add(tree_id)
                     continue
@@ -127,7 +158,9 @@ def _select_parallel_nodes(journal: Journal, params: SearchParams, num_workers: 
             while tree_root.parent:
                 tree_root = tree_root.parent
             tree_id = id(tree_root)
-            if tree_id not in processed_trees or len(processed_trees) >= len(viable_trees):
+            if tree_id not in processed_trees or len(processed_trees) >= len(
+                viable_trees
+            ):
                 nodes_to_process.append(node)
                 processed_trees.add(tree_id)
                 break
@@ -197,7 +230,11 @@ def parallel_tree_search_improve(
                     parent = child.parent
                     if parent:
                         parent.children.append(child)
-                    if best_state.score is None or (child.score and best_state.score and child.score > best_state.score):
+                    if best_state.score is None or (
+                        child.score
+                        and best_state.score
+                        and child.score > best_state.score
+                    ):
                         best_state = child
                     new_nodes.append(child)
             if not new_nodes:

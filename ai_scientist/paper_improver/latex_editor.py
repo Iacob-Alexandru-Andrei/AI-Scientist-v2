@@ -19,6 +19,7 @@ EDITOR_MODEL = "o1-preview-2024-09-12"
 def propose_edit(
     latex_path: Path,
     seed_ideas: str,
+    model_reviews: str,
     human_reviews: str | None = None,
     model: str = EDITOR_MODEL,
 ) -> str:
@@ -37,11 +38,15 @@ def propose_edit(
     """
     # Build a single prompt containing the source, reviews and improvement ideas
     # so the model can propose an updated version of the document.
-    prompt = f"""You are an expert academic writing assistant.  Below is the current LaTeX paper, a set of human reviews, and high-level improvement ideas.
+    prompt = f"""You are an expert academic writing assistant.  Below is the current LaTeX paper, a set of model-generated reviews for the current version, a set of human reviews for the initial version, and high-level improvement ideas for the initial version.
 Improve the document **in place** focusing on clarity, scientific rigour, and addressing reviewers’ concerns.  Output *only* the updated LaTeX in a fenced ```latex block.
 
 ############  CURRENT LaTeX ############
 {latex_path.read_text()}
+########################################
+
+############  Most Recent Model Reviws ############
+{model_reviews}
 ########################################
 
 ############ HUMAN REVIEWS ############

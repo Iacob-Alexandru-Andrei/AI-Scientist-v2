@@ -1,27 +1,27 @@
 # Default configuration for the paper improver pipeline
 paper_improver:
-  strategy: bfs
-  max_depth: 2
+  strategy: tree
+  max_depth: 4
   beam_size: 3
-  num_drafts: 3
+  num_drafts: 1
   debug_prob: 0.5
   max_debug_depth: 3
-  num_cite_rounds: 20
+  num_cite_rounds: 2
   num_reflections: 3
   page_limit: 4
   num_reviewers: 1
   output_dir: null
   llm_review:
     num_reflections: 1
-    num_fs_examples: 1
-    num_reviews_ensemble: 1
+    num_fs_examples: 0
+    num_reviews_ensemble: 2
     temperature: 0.75
   vlm_review:
     {}
   models:
-    editor: gemini-2.5-flash-preview-04-17
-    review: gemini-2.5-flash-preview-04-17
-    vlm: gemini-2.5-flash-preview-04-17
-    orchestrator: gemini-2.5-flash-preview-04-17
-    citation: gemini-2.5-flash-preview-04-17
-    reflection: gemini-2.5-flash-preview-04-17
+    model_editor: gemini-2.5-flash-preview-04-17
+    model_review: gemini-2.5-flash-preview-04-17
+    model_vlm: gemini-2.5-flash-preview-04-17
+    model_orchestrator: gemini-2.5-flash-preview-04-17
+    model_citation: gemini-2.5-flash-preview-04-17
+    model_reflection: gemini-2.5-flash-preview-04-17

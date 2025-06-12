@@ -41,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 def improve_paper(
     latex_project_dir: str | Path,
-    seed_ideas: str,
     human_reviews: str | None = None,
     strategy: str = "bfs",
     model_editor: str = EDITOR_MODEL,
@@ -58,7 +57,6 @@ def improve_paper(
     llm_num_fs_examples: int = 1,
     llm_temperature: float = 0.75,
     vlm_review_kwargs: dict | None = None,
-    llm_review_kwargs: dict | None = None,
     output_dir: str | Path | None = None,
     max_depth: int = 3,
     beam_size: int = 4,
@@ -94,10 +92,35 @@ def improve_paper(
             "n_writeup_reflections": num_reflections,
             "page_limit": page_limit,
         },
-        llm_review_kwargs=llm_review_kwargs,
+        llm_review_kwargs={
+            "num_reflections": llm_num_reflections,
+            "num_fs_examples": llm_num_fs_examples,
+            "num_reviews_ensemble": num_reviewers,
+            "temperature": llm_temperature,
+        },
         vlm_review_kwargs=vlm_review_kwargs,
     )
-    if strategy == "parallel":
+    if strategy == "tree":
+        # Priority-based tree search closely mirrors the main AI Scientist
+        # implementation but skips experiment execution.
+        best_state, _journal = tree_search_improve(
+            root,
+            human_reviews,
+            params=params,
+            model_editor=model_editor,
+            model_review=model_review,
+            model_vlm=model_vlm,
+            orchestrator_model=orchestrator_model,
+            llm_review_kwargs={
+                "num_reflections": llm_num_reflections,
+                "num_fs_examples": llm_num_fs_examples,
+                "num_reviews_ensemble": num_reviewers,
+                "temperature": llm_temperature,
+            },
+            vlm_review_kwargs=vlm_review_kwargs,
+            **kwargs,
+        )
+    elif strategy == "parallel":
         best_state, _journal = parallel_tree_search_improve(
             root,
             seed_ideas,
@@ -108,24 +131,12 @@ def improve_paper(
             model_vlm=model_vlm,
             orchestrator_model=orchestrator_model,
             writeup_params=params.writeup_params,
-            llm_review_kwargs=llm_review_kwargs,
-            vlm_review_kwargs=vlm_review_kwargs,
-            **kwargs,
-        )
-    elif strategy == "tree":
-        # Priority-based tree search closely mirrors the main AI Scientist
-        # implementation but skips experiment execution.
-        best_state, _journal = tree_search_improve(
-            root,
-            seed_ideas,
-            human_reviews,
-            params=params,
-            model_editor=model_editor,
-            model_review=model_review,
-            model_vlm=model_vlm,
-            orchestrator_model=orchestrator_model,
-            writeup_params=params.writeup_params,
-            llm_review_kwargs=llm_review_kwargs,
+            llm_review_kwargs={
+                "num_reflections": llm_num_reflections,
+                "num_fs_examples": llm_num_fs_examples,
+                "num_reviews_ensemble": int(num_reviewers),
+                "temperature": llm_temperature,
+            },
             vlm_review_kwargs=vlm_review_kwargs,
             **kwargs,
         )
@@ -141,19 +152,14 @@ def improve_paper(
             model_vlm=model_vlm,
             orchestrator_model=orchestrator_model,
             writeup_params=params.writeup_params,
-            llm_review_kwargs=llm_review_kwargs,
+            llm_review_kwargs={
+                "num_reflections": llm_num_reflections,
+                "num_fs_examples": llm_num_fs_examples,
+                "num_reviews_ensemble": num_reviewers,
+                "temperature": llm_temperature,
+            },
             vlm_review_kwargs=vlm_review_kwargs,
             **kwargs,
-        )
-    # Optionally refine citations for the best candidate
-    if num_cite_rounds > 0:
-        logger.info(
-            "Gathering citations with %s for %d rounds", model_citation, num_cite_rounds
-        )
-        citations_text = gather_citations(
-            best_state.latex_dir,
-            num_cite_rounds=num_cite_rounds,
-            small_model=model_citation,
         )
     # Final reflection loop to polish LaTeX and check page limits
     if num_reflections > 0:
@@ -190,7 +196,7 @@ def improve_paper(
                 temperature=llm_temperature,
             )
             review_img_cap_ref = perform_imgs_cap_ref_review(
-                client, client_model, pdf_path
+                client, model_vlm, pdf_path
             )
             with open(best_state.latex_dir / "review_text.json", "w") as f:
                 json.dump(review_text, f, indent=2)

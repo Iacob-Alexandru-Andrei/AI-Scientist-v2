@@ -8,7 +8,7 @@ import anthropic
 import backoff
 import openai
 
-MAX_NUM_TOKENS = 8192
+MAX_NUM_TOKENS = 16384
 
 AVAILABLE_LLMS = [
     "claude-3-5-sonnet-20240620",
@@ -70,7 +70,7 @@ def get_batch_responses_from_llm(
     client,
     model,
     system_message,
-    print_debug=True,
+    print_debug=False,
     msg_history=None,
     temperature=0.7,
     n_responses=1,
@@ -131,23 +131,23 @@ def get_batch_responses_from_llm(
         new_msg_history = [
             new_msg_history + [{"role": "assistant", "content": c}] for c in content
         ]
-    elif "gemini" in model:
-        new_msg_history = msg_history + [{"role": "user", "content": msg}]
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_message},
-                *new_msg_history,
-            ],
-            temperature=temperature,
-            max_tokens=MAX_NUM_TOKENS,
-            n=n_responses,
-            stop=None,
-        )
-        content = [r.message.content for r in response.choices]
-        new_msg_history = [
-            new_msg_history + [{"role": "assistant", "content": c}] for c in content
-        ]
+    # elif "gemini" in model:
+    #     new_msg_history = msg_history + [{"role": "user", "content": msg}]
+    #     response = client.chat.completions.create(
+    #         model=model,
+    #         messages=[
+    #             {"role": "system", "content": system_message},
+    #             *new_msg_history,
+    #         ],
+    #         temperature=temperature,
+    #         max_tokens=MAX_NUM_TOKENS,
+    #         n=n_responses,
+    #         stop=None,
+    #     )
+    #     content = [r.message.content for r in response.choices]
+    #     new_msg_history = [
+    #         new_msg_history + [{"role": "assistant", "content": c}] for c in content
+    #     ]
     else:
         content, new_msg_history = [], []
         for _ in range(n_responses):
@@ -156,7 +156,7 @@ def get_batch_responses_from_llm(
                 client,
                 model,
                 system_message,
-                print_debug=True,
+                print_debug=False,
                 msg_history=None,
                 temperature=temperature,
             )
@@ -231,7 +231,7 @@ def get_response_from_llm(
     client,
     model,
     system_message,
-    print_debug=True,
+    print_debug=False,
     msg_history=None,
     temperature=0.7,
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -410,9 +410,6 @@ def extract_json_between_markers(llm_output: str) -> dict | None:
         json_pattern = r"\{.*?\}"
         matches = re.findall(json_pattern, llm_output, re.DOTALL)
 
-    print(
-        f"Found {len(matches)} potential JSON matches in LLM output, matches[0]: {matches[0] if matches else 'None'}"
-    )
     for json_string in matches:
         json_string = json_string.strip()
         try:

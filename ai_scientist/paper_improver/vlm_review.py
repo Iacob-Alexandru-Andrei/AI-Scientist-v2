@@ -5,6 +5,7 @@ paper's figures and captions with a vision-language model.  Here we expose a
 single ``vlm_review`` function that selects the model and passes through the
 PDF path.  This mirrors ``llm_review`` for textual reviews.
 """
+
 from ai_scientist.perform_vlm_review import perform_imgs_cap_ref_review
 from ai_scientist.vlm import create_client as create_vlm_client
 
