@@ -33,7 +33,6 @@ from .llm_review import llm_review, DEFAULT_MODEL
 from .vlm_review import vlm_review, VLM_MODEL
 from .meta_review import meta_score
 from .utils import unique_subdir
-from .writeup import perform_writeup
 
 logger = logging.getLogger(__name__)
 
@@ -265,9 +264,9 @@ class Journal:
             "Candidates": "",
         }
         for n in self.nodes:
-            prompt["Candidates"] += (
-                f"ID: {n.id} Score: {n.score:.3f} paper text: {n.tex_path.read_text()} paper reviews: {str(n.llm_json) + str(n.vlm_json)} \n"
-            )
+            prompt[
+                "Candidates"
+            ] += f"ID: {n.id} Score: {n.score:.3f} paper text: {n.tex_path.read_text()} paper reviews: {str(n.llm_json) + str(n.vlm_json)} \n"
 
         try:
             selection = query(
@@ -307,6 +306,8 @@ def breadth_first_improve(
     p = params or SearchParams(max_depth=3, beam_size=4)
     if writeup_params is None:
         writeup_params = p.writeup_params
+    if writeup_params is not None:
+        from .writeup import perform_writeup
     if llm_review_kwargs is None:
         llm_review_kwargs = p.llm_review_kwargs or {}
     if vlm_review_kwargs is None:
@@ -466,6 +467,8 @@ def tree_search_improve(
         llm_review_kwargs = p.llm_review_kwargs or {}
     if vlm_review_kwargs is None:
         vlm_review_kwargs = p.vlm_review_kwargs or {}
+    from .writeup import perform_writeup
+
     root = PaperNode(root_dir / "latex", llm_model=model_review, vlm_model=model_vlm)
     safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()
@@ -591,5 +594,127 @@ def tree_search_improve(
             )
             journal.append(child)
             frontier.append((child.score, child))
+
+    return journal.best_node(orchestrator_model), journal
+
+
+def _crossover_papers(parent_a: PaperNode, parent_b: PaperNode, model: str) -> str:
+    """Use ``model`` to merge positive aspects of ``parent_b`` into ``parent_a``.
+
+    The returned string contains updated LaTeX code for ``parent_a``.
+    """
+
+    prompt = (
+        "You are an orchestrator model combining improvements from two LaTeX "
+        "drafts. Merge the positive qualities of Paper B into Paper A without "
+        "directly copying text. Return only the new LaTeX in a fenced ```latex"
+        " block.\n\n"
+        "#### PAPER A\n" + parent_a.tex_path.read_text() + "\n"
+        "#### PAPER B\n" + parent_b.tex_path.read_text()
+    )
+    client, m = llm.create_client(model)
+    resp = client.chat.completions.create(
+        model=m, messages=[{"role": "user", "content": prompt}], temperature=0.4
+    )
+    import re, textwrap
+
+    code = re.search(r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL)
+    if not code:
+        raise ValueError("No LaTeX block returned by orchestrator model")
+    return textwrap.dedent(code.group(1)).strip()
+
+
+def map_elites_improve(
+    root_dir: Path,
+    seed_ideas: str,
+    human_reviews: str | None = None,
+    *,
+    params: SearchParams | None = None,
+    model_editor: str = EDITOR_MODEL,
+    model_review: str = DEFAULT_MODEL,
+    model_vlm: str = VLM_MODEL,
+    orchestrator_model: str = ORCHESTRATOR_MODEL,
+    tournament_size: int = 3,
+    num_elites: int = 2,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
+) -> tuple[PaperNode | None, Journal]:
+    """Search using a simple MAP-ELITES strategy."""
+
+    p = params or SearchParams(max_depth=3, beam_size=4)
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
+
+    root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
+    journal = Journal()
+    journal.append(root)
+
+    elites: dict[int, PaperNode] = {}
+
+    def add_elite(node: PaperNode) -> None:
+        idx = int((node.score or 0) // 1)
+        current = elites.get(idx)
+        if current is None or (node.score or 0) > (current.score or -1):
+            elites[idx] = node
+
+    add_elite(root)
+
+    frontier = [root]
+    depth = 0
+
+    while frontier and depth < p.max_depth:
+        next_frontier: list[PaperNode] = []
+        for state in frontier:
+            for _ in range(p.beam_size):
+                # Tournament selection among elites
+                candidates = random.sample(
+                    list(elites.values()), min(tournament_size, len(elites))
+                )
+                prompt = {
+                    "Introduction": "Select the best parent for crossover",
+                    "Candidates": "",
+                }
+                for n in candidates:
+                    prompt["Candidates"] += f"ID: {n.id} Score: {n.score}\n"
+                try:
+                    choice = query(
+                        system_message=prompt,
+                        user_message=None,
+                        func_spec=node_selection_spec,
+                        model=orchestrator_model,
+                        temperature=0.3,
+                    )
+                    parent_b = next(
+                        (n for n in candidates if n.id == choice["selected_id"]),
+                        candidates[0],
+                    )
+                except Exception:
+                    parent_b = max(candidates, key=lambda n: n.score or 0)
+
+                child_dir = unique_subdir(state.latex_dir.parent, f"m{depth}")
+                shutil.copytree(state.latex_dir, child_dir)
+                tex_path = child_dir / "template.tex"
+                new_source = _crossover_papers(state, parent_b, orchestrator_model)
+                tex_path.write_text(new_source)
+
+                child = PaperNode(
+                    child_dir,
+                    depth + 1,
+                    parent=state,
+                    llm_model=model_review,
+                    vlm_model=model_vlm,
+                )
+                state.children.append(child)
+                safe_evaluate(
+                    child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+                )
+                journal.append(child)
+                add_elite(child)
+                next_frontier.append(child)
+        frontier = next_frontier
+        depth += 1
 
     return journal.best_node(orchestrator_model), journal

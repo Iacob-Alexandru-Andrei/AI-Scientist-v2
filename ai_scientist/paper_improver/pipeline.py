@@ -14,6 +14,7 @@ from datetime import datetime
 from .search import (
     breadth_first_improve,
     tree_search_improve,
+    map_elites_improve,
     ORCHESTRATOR_MODEL,
     SearchParams,
 )
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 def improve_paper(
     latex_project_dir: str | Path,
+    seed_ideas: str,
     human_reviews: str | None = None,
     strategy: str = "bfs",
     model_editor: str = EDITOR_MODEL,
@@ -105,6 +107,25 @@ def improve_paper(
         # implementation but skips experiment execution.
         best_state, _journal = tree_search_improve(
             root,
+            human_reviews,
+            params=params,
+            model_editor=model_editor,
+            model_review=model_review,
+            model_vlm=model_vlm,
+            orchestrator_model=orchestrator_model,
+            llm_review_kwargs={
+                "num_reflections": llm_num_reflections,
+                "num_fs_examples": llm_num_fs_examples,
+                "num_reviews_ensemble": num_reviewers,
+                "temperature": llm_temperature,
+            },
+            vlm_review_kwargs=vlm_review_kwargs,
+            **kwargs,
+        )
+    elif strategy == "map":
+        best_state, _journal = map_elites_improve(
+            root,
+            seed_ideas,
             human_reviews,
             params=params,
             model_editor=model_editor,

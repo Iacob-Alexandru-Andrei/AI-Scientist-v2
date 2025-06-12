@@ -168,7 +168,8 @@ seed_ideas = Path(args.research_idea).read_text()
 
 improve_paper(
     args.latex_dir,
-    human_reviews,
+    seed_ideas,
+    human_reviews=human_reviews,
     max_depth=args.max_depth,
     beam_size=args.beam_size,
     num_drafts=args.num_drafts,
