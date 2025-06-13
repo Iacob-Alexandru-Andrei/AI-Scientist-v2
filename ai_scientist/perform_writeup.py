@@ -312,9 +312,9 @@ This JSON will be automatically parsed, so ensure the format is precise."""
                 x_str = x.strip().strip('"').strip("'")
                 if x_str:
                     selected_indices.append(int(x_str))
-            assert all(
-                [0 <= i < len(papers) for i in selected_indices]
-            ), "Invalid paper index"
+            assert all([0 <= i < len(papers) for i in selected_indices]), (
+                "Invalid paper index"
+            )
             bibtexs = [papers[i]["citationStyles"]["bibtex"] for i in selected_indices]
 
             cleaned_bibtexs = []
@@ -746,13 +746,13 @@ If you believe you are done, simply say: "I am done".
                     compile_attempt += 1
                     print(f"Compiled {base_pdf_file}_{compile_attempt}.pdf")
                 else:
-                    print(f"No changes in reflection step {i+1}.")
+                    print(f"No changes in reflection step {i + 1}.")
                     break
             else:
-                print(f"No valid LaTeX code block found in reflection step {i+1}.")
+                print(f"No valid LaTeX code block found in reflection step {i + 1}.")
                 break
 
-        return osp.exists(base_pdf_file + f"_{compile_attempt-1}.pdf")
+        return osp.exists(base_pdf_file + f"_{compile_attempt - 1}.pdf")
 
     except Exception:
         print("EXCEPTION in perform_writeup:")

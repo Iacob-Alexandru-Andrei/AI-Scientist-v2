@@ -335,11 +335,18 @@ def get_reflection_page_info(reflection_pdf, page_limit):
 
 
 def get_citation_addition(
-    client, model, context, current_round, total_rounds, idea_text
+    client,
+    model,
+    context,
+    current_round,
+    total_rounds,
+    idea_text,
+    model_reviews,
+    human_reviews,
 ):
     report, citations = context
     msg_history = []
-    citation_system_msg_template = """You are an ambitious AI researcher who is looking to publish a paper to a workshop at ICLR 2025 that explores real-world pitfalls, failures, and challenges in deep learning.
+    citation_system_msg_template = """You are an ambitious AI researcher who is looking to publish a paper to a top-tier ML conference that will contribute significantly to the field.
 You have already completed the experiments and now you are looking to collect citations to related papers.
 This phase focuses on collecting references and annotating them to be integrated later.
 Collected citations will be added to a references.bib file.
@@ -364,14 +371,19 @@ DO NOT ADD A CITATION THAT ALREADY EXISTS!"""
 
     citation_first_prompt_template = """Round {current_round}/{total_rounds}:
 
-You planned and executed the following idea:
-```markdown
-{Idea}
+Your paper has received the following reviews from your peers:
+```
+{model_reviews}
 ```
 
-You produced the following report:
-```markdown
-{report}
+Which received the following initial human reviews:
+```
+{human_reviews}
+```
+
+And the following list of ideas to improve it:
+```
+{Idea}
 ```
 
 Your current list of citations is:
@@ -431,6 +443,8 @@ This JSON will be automatically parsed, so ensure the format is precise."""
                 Idea=idea_text,
                 report=report,
                 citations=citations,
+                model_reviews=model_reviews,
+                human_reviews=human_reviews,
             ),
             client=client,
             model=model,
@@ -530,10 +544,10 @@ This JSON will be automatically parsed, so ensure the format is precise."""
     return references_prompt, False
 
 
-writeup_system_message_template = """You are an ambitious AI researcher who is looking to publish a paper to the "I Can't Believe It's Not Better" (ICBINB) Workshop at ICLR 2025.
-This workshop aims to highlight real-world pitfalls, challenges, and negative or inconclusive results in deep learning, encouraging open discussion.
-You must accurately represent the results of the experiments.
-The main paper is limited to {page_limit} pages in single-column format, not counting references. In general, try to use the available space and include all relevant information.
+writeup_system_message_template = """You are an ambitious AI researcher who is looking to publish a paper that will contribute significantly to the field.
+Ensure that the paper is scientifically accurate, objective, and truthful. Accurately report the experimental results, even if they are negative or inconclusive.
+You are planning to submit to a top-tier ML conference, which has guidelines:
+The main paper is limited to {page_limit} pages in double-column icml2025 format, not counting references. In general, try to use the available space and include all relevant information.
 DO NOT USE MORE THAN {page_limit} PAGES FOR THE MAIN TEXT.
 MINIMIZE THE USAGE OF ITEMIZE OR ENUMERATE. ONLY USE THEM IF THEY ARE ABSOLUTELY NECESSARY AND CONTAIN SUBSTANTIAL INFORMATION.
 Ensure that the tables and figures are correctly placed in a reasonable location and format.
@@ -549,34 +563,42 @@ Here are some tips for each section of the paper:
   - Try to keep it under 2 lines.
 
 - **Abstract**:
-  - Brief summary highlighting the nature of the challenge or pitfall explored.
-  - Concise motivation of why this matters for real-world deployment.
-  - This should be one continuous paragraph.
+  - TL;DR of the paper.
+  - What are we trying to do and why is it relevant?
+  - Make sure the abstract reads smoothly and is well-motivated. This should be one continuous paragraph.
 
 - **Introduction**:
-  - Overview of the issue or challenge being explored.
-  - Clearly state why this problem is important, especially for practical or real-world contexts.
-  - Summarize your contributions or findings: they may include negative results, real-world pitfalls, unexpected behaviors, or partial improvements.
+  - Longer version of the Abstract, i.e., an overview of the entire paper.
+  - Provide context to the study and explain its relevance.
+  - If results are inconclusive or negative, present them frankly; if they are positive, you may highlight how the approach effectively addresses the research question or problem.
+  - Summarize your contributions, highlighting pertinent findings, insights, or proposed methods.
 
 - **Related Work**:
-  - Cite relevant papers or approaches that have tackled similar issues or have encountered similar pitfalls.
-  - Compare and contrast with your own findings.
+  - Academic siblings of our work, i.e., alternative attempts in literature at trying to address the same or similar problems.
+  - Compare and contrast their approach with yours, noting key differences or similarities.
+  - Ensure proper citations are provided.
 
 - **Background** (optional):
-  - Provide necessary technical or domain-specific background if needed.
+  - Present foundational concepts or prior work needed to understand your method.
+  - This should include necessary definitions, the problem setting, or relevant theoretical constructs.
 
 - **Method / Problem Discussion**:
-  - Detail the problem context or the method if it is relevant to highlight the challenges faced.
-  - If results are not strictly an improvement, discuss partial successes or lessons learned.
+  - Clearly detail what you propose to do and why. If your study aims to address certain hypotheses, describe them and how your method is constructed to test them.
+  - If results are negative or inconclusive, you may suggest improvements or discuss possible causes.
 
-- **Experiments** (if applicable):
-  - Present results truthfully according to the data you have. Negative, unexpected, or inconclusive findings are valid contributions for this workshop.
-  - Include figures, tables, or real-world examples that illustrate the pitfalls.
-  - Include up to 4 figures in the main text. All other figures should be in the appendix.
+- **Experimental Setup**:
+  - Explain how you tested your method or hypothesis.
+  - Describe necessary details such as data, environment, and baselines, but omit hardware details unless explicitly mentioned.
+
+- **Experiments**:
+  - Present the results truthfully according to the data you have. If outcomes are not as expected, discuss it transparently.
+  - Include comparisons to baselines if available, and only include analyses supported by genuine data.
+  - Try to include all relevant plots and tables. Consider combining multiple plots into one figure if they are related.
 
 - **Conclusion**:
-  - Summarize the main lessons learned or contributions.
-  - Suggest next steps or future directions, highlighting how these insights can help the community avoid or overcome similar issues.
+  - Summarize the entire paper, including key strengths or findings.
+  - If results are strong, highlight how they might address the research problem.
+  - If results are negative or inconclusive, highlight potential improvements or reasons and propose future directions.
 
 - **Appendix**:
   - Place for supplementary material that did not fit in the main paper.
@@ -599,22 +621,23 @@ Ensure proper citation usage:
 When returning final code, place it in fenced triple backticks with 'latex' syntax highlighting.
 """
 
-writeup_prompt = """Your goal is to write up the following idea:
+writeup_prompt = """Your goal is to improve a paper given:
 
+
+Reviews from your peers:
+```
+{model_reviews}
+```
+
+Initial human reviews, may be outdated::
+```markdown
+{human_reviews}
+```
+
+Seed ideas for improvement:
 ```markdown
 {idea_text}
 ```
-
-We have the following experiment summaries (JSON):
-```json
-{summaries}
-```
-
-We also have a script used to produce the final plots (use this to see how the plots are generated and what names are used in the legend):
-```python
-{aggregator_code}
-```
-Please also consider which plots can naturally be grouped together as subfigures.
 
 Available plots for the writeup (use these filenames):
 ```
@@ -662,30 +685,30 @@ def load_idea_text(base_folder):
     return idea_text
 
 
-def load_exp_summaries(base_folder):
-    """
-    Load the experiment summaries from the base folder.
-    """
-    summary_files = [
-        ("logs/0-run/baseline_summary.json", "BASELINE_SUMMARY"),
-        ("logs/0-run/research_summary.json", "RESEARCH_SUMMARY"),
-        ("logs/0-run/ablation_summary.json", "ABLATION_SUMMARY"),
-    ]
-    loaded_summaries = {}
-    for fname, key in summary_files:
-        path = osp.join(base_folder, fname)
-        if osp.exists(path):
-            try:
-                with open(path, "r") as f:
-                    loaded_summaries[key] = json.load(f)
-            except json.JSONDecodeError:
-                print(
-                    f"Warning: {fname} is not valid JSON. Using empty data for {key}."
-                )
-                loaded_summaries[key] = {}
-        else:
-            loaded_summaries[key] = {}
-    return loaded_summaries
+# def load_exp_summaries(base_folder):
+#     """
+#     Load the experiment summaries from the base folder.
+#     """
+#     summary_files = [
+#         ("logs/0-run/baseline_summary.json", "BASELINE_SUMMARY"),
+#         ("logs/0-run/research_summary.json", "RESEARCH_SUMMARY"),
+#         ("logs/0-run/ablation_summary.json", "ABLATION_SUMMARY"),
+#     ]
+#     loaded_summaries = {}
+#     for fname, key in summary_files:
+#         path = osp.join(base_folder, fname)
+#         if osp.exists(path):
+#             try:
+#                 with open(path, "r") as f:
+#                     loaded_summaries[key] = json.load(f)
+#             except json.JSONDecodeError:
+#                 print(
+#                     f"Warning: {fname} is not valid JSON. Using empty data for {key}."
+#                 )
+#                 loaded_summaries[key] = {}
+#         else:
+#             loaded_summaries[key] = {}
+#     return loaded_summaries
 
 
 def filter_experiment_summaries(exp_summaries, step_name):
@@ -742,7 +765,14 @@ def filter_experiment_summaries(exp_summaries, step_name):
     return filtered_summaries
 
 
-def gather_citations(base_folder, num_cite_rounds=20, small_model="gpt-4o-2024-05-13"):
+def gather_citations(
+    base_folder,
+    latex_text,
+    model_reviews,
+    human_reviews,
+    num_cite_rounds=20,
+    small_model="gpt-4o-2024-05-13",
+):
     """
     Gather citations for a paper, with ability to resume from previous progress.
 
@@ -781,18 +811,18 @@ def gather_citations(base_folder, num_cite_rounds=20, small_model="gpt-4o-2024-0
     try:
         # Load idea text and summaries
         idea_text = load_idea_text(base_folder)
-        exp_summaries = load_exp_summaries(base_folder)
-        filtered_summaries = filter_experiment_summaries(
-            exp_summaries, step_name="citation_gathering"
-        )
-        filtered_summaries_str = json.dumps(filtered_summaries, indent=2)
+        # exp_summaries = load_exp_summaries(base_folder)
+        # filtered_summaries = filter_experiment_summaries(
+        #     exp_summaries, step_name="citation_gathering"
+        # # )
+        # filtered_summaries_str = json.dumps(filtered_summaries, indent=2)
 
         # Run small model for citation additions
         client, client_model = create_client(small_model)
 
         for round_idx in range(current_round, num_cite_rounds):
             try:
-                context_for_citation = (filtered_summaries_str, citations_text)
+                context_for_citation = (latex_text, citations_text)
                 addition, done = get_citation_addition(
                     client,
                     client_model,
@@ -800,6 +830,8 @@ def gather_citations(base_folder, num_cite_rounds=20, small_model="gpt-4o-2024-0
                     round_idx,
                     num_cite_rounds,
                     idea_text,
+                    model_reviews,
+                    human_reviews,
                 )
 
                 if done:
@@ -856,6 +888,8 @@ def gather_citations(base_folder, num_cite_rounds=20, small_model="gpt-4o-2024-0
 
 def perform_writeup(
     base_folder,
+    model_reviews,
+    human_reviews,
     citations_text=None,
     no_writing=False,
     num_cite_rounds=20,
@@ -864,12 +898,12 @@ def perform_writeup(
     n_writeup_reflections=3,
     page_limit=4,
 ):
-    pdf_file = osp.join(base_folder, f"{osp.basename(base_folder)}.pdf")
     latex_folder = osp.join(base_folder, "latex")
+    pdf_file = osp.join(base_folder, f"{osp.basename(base_folder)}.pdf")
 
     # Cleanup any previous latex folder and pdf
-    if osp.exists(latex_folder):
-        shutil.rmtree(latex_folder)
+    # if osp.exists(latex_folder):
+    #     shutil.rmtree(latex_folder)
     if osp.exists(pdf_file):
         os.remove(pdf_file)
 
@@ -880,17 +914,17 @@ def perform_writeup(
 
     try:
         idea_text = load_idea_text(base_folder)
-        exp_summaries = load_exp_summaries(base_folder)
-        filtered_summaries_for_writeup = filter_experiment_summaries(
-            exp_summaries, step_name="writeup"
-        )
+        # exp_summaries = load_exp_summaries(base_folder)
+        # filtered_summaries_for_writeup = filter_experiment_summaries(
+        #     exp_summaries, step_name="writeup"
+        # )
         # Convert them to one big JSON string for context
-        combined_summaries_str = json.dumps(filtered_summaries_for_writeup, indent=2)
+        # combined_summaries_str = json.dumps(filtered_summaries_for_writeup, indent=2)
 
         # Prepare a new fresh latex folder
         if not osp.exists(osp.join(latex_folder, "template.tex")):
             shutil.copytree(
-                "ai_scientist/blank_icbinb_latex", latex_folder, dirs_exist_ok=True
+                "ai_scientist/blank_icml_latex", latex_folder, dirs_exist_ok=True
             )
 
         writeup_file = osp.join(latex_folder, "template.tex")
@@ -904,15 +938,6 @@ def perform_writeup(
             for fplot in os.listdir(figures_dir):
                 if fplot.lower().endswith(".png"):
                     plot_names.append(fplot)
-
-        # Load aggregator script to include in the prompt
-        aggregator_path = osp.join(base_folder, "auto_plot_aggregator.py")
-        aggregator_code = ""
-        if osp.exists(aggregator_path):
-            with open(aggregator_path, "r") as fa:
-                aggregator_code = fa.read()
-        else:
-            aggregator_code = "No aggregator script found."
 
         if no_writing:
             compile_latex(latex_folder, pdf_file)
@@ -932,9 +957,15 @@ def perform_writeup(
 
             # If still no citations, gather them
             if not citations_text:
-                citations_text = gather_citations(
-                    base_folder, num_cite_rounds, small_model
-                )
+                with open(writeup_file, "r") as f:
+                    citations_text = gather_citations(
+                        base_folder,
+                        f.read(),
+                        model_reviews,
+                        human_reviews,
+                        num_cite_rounds,
+                        small_model,
+                    )
                 if citations_text is None:
                     print("Warning: Citation gathering failed")
                     citations_text = ""
@@ -986,9 +1017,9 @@ def perform_writeup(
             writeup_text = f.read()
 
         combined_prompt = writeup_prompt.format(
+            model_reviews=model_reviews,
+            human_reviews=human_reviews,
             idea_text=idea_text,
-            summaries=combined_summaries_str,
-            aggregator_code=aggregator_code,
             plot_list=", ".join(plot_names),
             latex_writeup=writeup_text,
             plot_descriptions=plot_descriptions_str,
@@ -1005,9 +1036,10 @@ def perform_writeup(
         latex_code_match = re.search(r"```latex(.*?)```", response, re.DOTALL)
         if not latex_code_match:
             return False
-        updated_latex_code = latex_code_match.group(1).strip()
-        with open(writeup_file, "w") as f:
-            f.write(updated_latex_code)
+        else:
+            updated_latex_code = latex_code_match.group(1).strip()
+            with open(writeup_file, "w") as f:
+                f.write(updated_latex_code)
 
         # Multiple reflection loops on the final LaTeX
         for i in range(n_writeup_reflections):

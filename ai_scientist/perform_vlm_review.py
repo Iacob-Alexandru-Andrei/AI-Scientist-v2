@@ -269,7 +269,7 @@ def extract_figure_screenshots(
                     f"figure_{fig_label_escaped}_{page_num}_{clip_rect}".encode()
                 ).hexdigest()[:10]
                 fig_filename = (
-                    f"figure_{fig_label_escaped}_Page_{page_num+1}_{fig_hash}.png"
+                    f"figure_{fig_label_escaped}_Page_{page_num + 1}_{fig_hash}.png"
                 )
                 fig_filepath = os.path.join(img_folder_path, fig_filename)
                 pix.save(fig_filepath)

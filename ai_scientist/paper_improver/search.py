@@ -20,11 +20,13 @@ from collections import deque
 import heapq
 import uuid
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import shutil
 import json
 import logging
+from ai_scientist import llm
+from ai_scientist.perform_icbinb_writeup import gather_citations
 from ai_scientist.treesearch.backend import query, FunctionSpec
 from .latex_editor import propose_edit, EDITOR_MODEL
 from .llm_review import llm_review, DEFAULT_MODEL
@@ -55,12 +57,29 @@ class SearchParams:
     num_drafts: int = 3
     debug_prob: float = 0.5
     max_debug_depth: int = 3
+    # parameters for writeup generation after each edit
+    writeup_params: dict | None = None
+    # parameters forwarded to llm_review and vlm_review
+    llm_review_kwargs: dict | None = None
+    vlm_review_kwargs: dict | None = None
 
 
-def safe_evaluate(node: "PaperNode") -> float | None:
+def safe_evaluate(
+    node: "PaperNode",
+    llm_kwargs: dict | None = None,
+    vlm_kwargs: dict | None = None,
+) -> float | None:
     """Evaluate a node and mark it buggy on failure."""
     try:
-        return node.evaluate()
+        return node.evaluate(llm_kwargs=llm_kwargs, vlm_kwargs=vlm_kwargs)
+    except TypeError:
+        # compatibility with older tests that mock evaluate without kwargs
+        try:
+            return node.evaluate()
+        except Exception as exc:
+            logger.error("Evaluation failed for %s: %s", node.latex_dir, exc)
+            node.is_buggy = True
+            return None
     except Exception as exc:
         # Any exception during ``evaluate`` marks the node as buggy so the
         # search algorithms can attempt a debug retry.
@@ -94,34 +113,67 @@ node_selection_spec = FunctionSpec(
 )
 
 
+@dataclass(eq=False)
 class PaperNode:
     """A paper version on disk (latex_dir contains template.tex)."""
 
-    def __init__(
-        self,
-        latex_dir: Path,
-        depth: int = 0,
-        parent: "PaperNode | None" = None,
-        llm_model: str = DEFAULT_MODEL,
-        vlm_model: str = VLM_MODEL,
-        debug_depth: int = 0,
-        batch_review_cnt: int = 2,
-    ):
-        self.id = uuid.uuid4().hex
-        self.latex_dir = latex_dir
-        self.depth = depth
-        self.parent = parent
-        self.llm_model = llm_model
-        self.vlm_model = vlm_model
-        self.children: list["PaperNode"] = []
-        self.pdf_path = latex_dir / "template.pdf"  # compiled later
-        self.score: float | None = None
-        self.llm_json: dict | None = None
-        self.vlm_json: dict | None = None
-        # compatibility with treesearch Journal
-        self.is_buggy = False
-        self.is_buggy_plots = False
-        self.debug_depth = debug_depth
+    latex_dir: Path
+    depth: int = 0
+    parent: "PaperNode | None" = None
+    llm_model: str = DEFAULT_MODEL
+    vlm_model: str = VLM_MODEL
+    debug_depth: int = 0
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    score: float | None = None
+    llm_json: dict | None = None
+    vlm_json: dict | None = None
+    is_buggy: bool = False
+    is_buggy_plots: bool = False
+    step: int = 0
+    children: list["PaperNode"] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.pdf_path = self.latex_dir / "template.pdf"
+        self.tex_path = self.latex_dir / "template.tex"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "latex_dir": str(self.latex_dir),
+            "depth": self.depth,
+            "parent_id": self.parent.id if self.parent else None,
+            "llm_model": self.llm_model,
+            "vlm_model": self.vlm_model,
+            "score": self.score,
+            "llm_json": self.llm_json,
+            "vlm_json": self.vlm_json,
+            "is_buggy": self.is_buggy,
+            "is_buggy_plots": self.is_buggy_plots,
+            "debug_depth": self.debug_depth,
+            "step": self.step,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, journal: "Journal" | None = None) -> "PaperNode":
+        parent = None
+        if journal and data.get("parent_id"):
+            parent = journal.get_node_by_id(data["parent_id"])
+        node = cls(
+            latex_dir=Path(data["latex_dir"]),
+            depth=data.get("depth", 0),
+            parent=parent,
+            llm_model=data.get("llm_model", DEFAULT_MODEL),
+            vlm_model=data.get("vlm_model", VLM_MODEL),
+            debug_depth=data.get("debug_depth", 0),
+        )
+        node.id = data.get("id", node.id)
+        node.score = data.get("score")
+        node.llm_json = data.get("llm_json")
+        node.vlm_json = data.get("vlm_json")
+        node.is_buggy = data.get("is_buggy", False)
+        node.is_buggy_plots = data.get("is_buggy_plots", False)
+        node.step = data.get("step", 0)
+        return node
 
     def compile(self):
         # ``compile_latex`` is reused from the main code base. It simply
@@ -130,16 +182,27 @@ class PaperNode:
 
         compile_latex(str(self.latex_dir), str(self.pdf_path))
 
-    def evaluate(self):
+    def evaluate(
+        self,
+        *,
+        llm_kwargs: dict | None = None,
+        vlm_kwargs: dict | None = None,
+    ):
         if not self.pdf_path.exists():
             self.compile()
+        llm_kwargs = llm_kwargs or {}
+        vlm_kwargs = vlm_kwargs or {}
+        print(llm_kwargs)
         # Run LLM and VLM reviews then compute an aggregate numeric score.
-        self.llm_json = llm_review(str(self.pdf_path), model=self.llm_model)
-        # self.llm_json_2 = llm_review(str(self.pdf_path), model=self.llm_model)
-        self.vlm_json = vlm_review(str(self.pdf_path), model=self.vlm_model)
+        self.llm_json = llm_review(
+            self.tex_path.read_text(), model=self.llm_model, **llm_kwargs
+        )
+        self.vlm_json = vlm_review(
+            str(self.pdf_path), model=self.vlm_model, **vlm_kwargs
+        )
         self.score = meta_score([self.llm_json, self.vlm_json])
         # Persist results for analysis
-        with open(self.latex_dir / "reviews.json", "w") as f:
+        with open(self.latex_dir.parent / "reviews.json", "w") as f:
             json.dump(
                 {"llm": self.llm_json, "vlm": self.vlm_json, "score": self.score},
                 f,
@@ -160,6 +223,31 @@ class Journal:
         node.step = len(self.nodes)
         self.nodes.append(node)
 
+    @property
+    def good_nodes(self) -> list[PaperNode]:
+        return [n for n in self.nodes if not n.is_buggy and not n.is_buggy_plots]
+
+    @property
+    def buggy_nodes(self) -> list[PaperNode]:
+        return [n for n in self.nodes if n.is_buggy]
+
+    def get_node_by_id(self, node_id: str) -> PaperNode | None:
+        for n in self.nodes:
+            if n.id == node_id:
+                return n
+        return None
+
+    @property
+    def draft_nodes(self) -> list[PaperNode]:
+        """Nodes without parents (initial drafts)."""
+        return [n for n in self.nodes if n.parent is None]
+
+    # Backwards compatibility with the original tree-search API
+    def get_best_node(
+        self, orchestrator_model: str = ORCHESTRATOR_MODEL
+    ) -> PaperNode | None:
+        return self.best_node(orchestrator_model)
+
     def best_node(
         self, orchestrator_model: str = ORCHESTRATOR_MODEL
     ) -> PaperNode | None:
@@ -171,12 +259,14 @@ class Journal:
         # Construct a small system prompt summarising each candidate's score.
         prompt = {
             "Introduction": (
-                "You are an experienced researcher choosing the best improved paper version based on review scores."
+                "You are an experienced researcher choosing the best improved paper version based on review scores, text and reviews"
             ),
             "Candidates": "",
         }
         for n in self.nodes:
-            prompt["Candidates"] += f"ID: {n.id} Score: {n.score:.3f}\n"
+            prompt[
+                "Candidates"
+            ] += f"ID: {n.id} Score: {n.score:.3f} paper text: {n.tex_path.read_text()} paper reviews: {str(n.llm_json) + str(n.vlm_json)} \n"
 
         try:
             selection = query(
@@ -208,26 +298,56 @@ def breadth_first_improve(
     model_review: str = DEFAULT_MODEL,
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
+    writeup_params: dict | None = None,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
 ):
     """Explore paper edits using a breadth-first expansion order."""
     p = params or SearchParams(max_depth=3, beam_size=4)
+    if writeup_params is None:
+        writeup_params = p.writeup_params
+    if writeup_params is not None:
+        from .writeup import perform_writeup
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
     # The root node corresponds to the initial paper.  It is evaluated once so
     # the search has a baseline score.
     root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
-    safe_evaluate(root)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()  # track every explored node for later selection
     journal.append(root)
     frontier = deque([root])
     best_state = root
     # Create a number of draft children before entering the main loop
     for i in range(p.num_drafts):
-        draft_dir = unique_subdir(root.latex_dir.parent, "draft")
+        draft_dir = unique_subdir(root.latex_dir.parent.parent, "draft")
         shutil.copytree(root.latex_dir, draft_dir)
         tex_path = draft_dir / "template.tex"
         new_source = propose_edit(
-            tex_path, seed_ideas, human_reviews, model=model_editor
+            tex_path,
+            seed_ideas,
+            model_reviews=str(root.llm_json) + str(root.vlm_json),
+            human_reviews=human_reviews,
+            model=model_editor,
         )  # model proposes a complete LaTeX rewrite of template.tex
         tex_path.write_text(new_source)
+        if writeup_params is not None:
+            tex_content = tex_path.read_text()
+            citations_text = gather_citations(
+                draft_dir,
+                num_cite_rounds=writeup_params["num_cite_rounds"],
+                small_model=writeup_params["small_model"],
+            )
+            if citations_text:
+                pattern_end = r"\end{filecontents}"
+                tex_content = tex_content.replace(
+                    pattern_end,
+                    f"\n{citations_text}{pattern_end}",
+                )
+                tex_path.write_text(tex_content)
+
         draft = PaperNode(
             draft_dir,
             root.depth + 1,
@@ -236,7 +356,7 @@ def breadth_first_improve(
             vlm_model=model_vlm,
         )
         root.children.append(draft)  # keep a tree structure for analysis
-        safe_evaluate(draft)
+        safe_evaluate(draft, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
         journal.append(draft)
         frontier.append(draft)
     # Standard BFS loop
@@ -244,7 +364,13 @@ def breadth_first_improve(
     while frontier:
         state = frontier.popleft()
         logger.info("Evaluating depth=%s dir=%s", state.depth, state.latex_dir)
-        score = state.score if state is root else safe_evaluate(state)
+        score = (
+            state.score
+            if state is root
+            else safe_evaluate(
+                state, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+            )
+        )
         if score and best_state.score and score > best_state.score:
             best_state = state
             logger.info("[NEW BEST] score=%.3f at %s", score, state.latex_dir)
@@ -257,12 +383,20 @@ def breadth_first_improve(
             and random.random() < p.debug_prob
         ):
             tex_path = state.latex_dir / "template.tex"
-            new_src = propose_edit(
-                tex_path, seed_ideas, human_reviews, model=model_editor
+            new_source = propose_edit(
+                tex_path,
+                seed_ideas,
+                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                human_reviews=human_reviews,
+                model=model_editor,
             )  # attempt to fix the buggy document
-            tex_path.write_text(new_src)
+            tex_path.write_text(new_source)
             state.debug_depth += 1
-            safe_evaluate(state)
+            if writeup_params is not None:
+                perform_writeup(state.latex_dir, **writeup_params)
+            safe_evaluate(
+                state, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+            )
         # Generate ``beam_size`` children by applying LLM edits to the current
         # LaTeX source
         for i in range(p.beam_size):
@@ -273,11 +407,27 @@ def breadth_first_improve(
             new_source = propose_edit(
                 tex_path,
                 seed_ideas,
-                human_reviews,
+                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                human_reviews=human_reviews,
                 model=model_editor,
             )  # LLM suggests an updated LaTeX file
             # Overwrite the source so subsequent evaluation compiles the new version
             tex_path.write_text(new_source)
+            if writeup_params is not None:
+                tex_content = tex_path.read_text()
+                citations_text = gather_citations(
+                    child_dir,
+                    num_cite_rounds=writeup_params["num_cite_rounds"],
+                    small_model=writeup_params["small_model"],
+                )
+                if citations_text:
+                    pattern_end = r"\end{filecontents}"
+                    tex_content = tex_content.replace(
+                        pattern_end,
+                        f"\n{citations_text}{pattern_end}",
+                    )
+                    tex_path.write_text(tex_content)
+
             child = PaperNode(
                 child_dir,
                 state.depth + 1,
@@ -287,7 +437,9 @@ def breadth_first_improve(
             )
             state.children.append(child)
             # Score the newly created child immediately so it can be queued
-            safe_evaluate(child)
+            safe_evaluate(
+                child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+            )
             journal.append(child)
             frontier.append(child)
     # Let the orchestrator or fallback logic pick the best candidate overall
@@ -295,6 +447,184 @@ def breadth_first_improve(
 
 
 def tree_search_improve(
+    root_dir: Path,
+    human_reviews: str | None = None,
+    *,
+    params: SearchParams | None = None,
+    model_editor: str = EDITOR_MODEL,
+    model_review: str = DEFAULT_MODEL,
+    model_vlm: str = VLM_MODEL,
+    orchestrator_model: str = ORCHESTRATOR_MODEL,
+    num_cite_rounds: int = 2,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
+    n_writeup_reflections=3,
+    page_limit: int = 8,
+):
+    """Priority-based tree search over paper versions."""
+    p = params or SearchParams(max_depth=3, beam_size=4)
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
+    from .writeup import perform_writeup
+
+    root = PaperNode(root_dir / "latex", llm_model=model_review, vlm_model=model_vlm)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
+    journal = Journal()
+    journal.append(root)
+    frontier: list[tuple[float, PaperNode]] = []
+    # Generate a few initial drafts and push them onto the priority queue
+    for i in range(p.num_drafts):
+        draft_dir = unique_subdir(root.latex_dir.parent.parent, "draft")
+        shutil.copytree(root.latex_dir.parent, draft_dir)
+        success = perform_writeup(
+            base_folder=draft_dir,
+            model_reviews=str(root.llm_json) + str(root.vlm_json),
+            human_reviews=human_reviews,
+            num_cite_rounds=num_cite_rounds,
+            small_model=model_vlm,
+            big_model=model_editor,
+            n_writeup_reflections=n_writeup_reflections,
+            page_limit=page_limit,
+        )
+        while not success:
+            logger.warning(
+                "Writeup failed for %s, retrying with a new draft", draft_dir
+            )
+            draft_dir = unique_subdir(root.latex_dir.parent.parent, "draft")
+            shutil.copytree(root.latex_dir.parent, draft_dir)
+            success = perform_writeup(
+                base_folder=draft_dir,
+                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                human_reviews=human_reviews,
+                num_cite_rounds=num_cite_rounds,
+                small_model=model_vlm,
+                big_model=model_editor,
+                n_writeup_reflections=n_writeup_reflections,
+                page_limit=page_limit,
+            )
+        draft = PaperNode(
+            draft_dir / "latex",
+            root.depth + 1,
+            parent=root,
+            llm_model=model_review,
+            vlm_model=model_vlm,
+        )
+        root.children.append(draft)
+        safe_evaluate(draft, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
+        journal.append(draft)
+        frontier.append((draft.score, draft))  # min-heap by negative score
+
+    # Main priority queue loop
+    while frontier:
+        frontier.sort()
+        print([n[0] for n in frontier])
+        _, node = frontier.pop()
+        logger.info(
+            "Exploring depth=%s dir=%s score=%.3f, latex_dir=%s, max depth=%s",
+            node.depth,
+            node.latex_dir,
+            node.score,
+            p.max_depth,
+        )
+        if node.depth >= p.max_depth:
+            continue
+        if (
+            node.is_buggy
+            and node.debug_depth < p.max_debug_depth
+            and random.random() < p.debug_prob
+        ):
+            perform_writeup(
+                base_folder=node.latex_dir.parent,
+                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                human_reviews=human_reviews,
+                num_cite_rounds=num_cite_rounds,
+                small_model=model_vlm,
+                big_model=model_editor,
+                n_writeup_reflections=n_writeup_reflections,
+                page_limit=page_limit,
+            )
+            node.debug_depth += 1
+            safe_evaluate(
+                node, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+            )
+        # Expand by proposing ``beam_size`` edits from the current node
+        for i in range(p.beam_size):
+            child_dir = unique_subdir(node.latex_dir.parent.parent, f"d{node.depth}")
+            shutil.copytree(node.latex_dir.parent, child_dir)
+            success = perform_writeup(
+                base_folder=child_dir,
+                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                human_reviews=human_reviews,
+                num_cite_rounds=num_cite_rounds,
+                small_model=model_vlm,
+                big_model=model_editor,
+                n_writeup_reflections=n_writeup_reflections,
+                page_limit=page_limit,
+            )
+            while not success:
+                logger.warning(
+                    "Writeup failed for %s, retrying with a new draft", child_dir
+                )
+                child_dir = unique_subdir(
+                    node.latex_dir.parent.parent, f"d{node.depth}"
+                )
+                shutil.copytree(node.latex_dir.parent, child_dir)
+                success = perform_writeup(
+                    base_folder=child_dir,
+                    model_reviews=str(root.llm_json) + str(root.vlm_json),
+                    human_reviews=human_reviews,
+                    num_cite_rounds=num_cite_rounds,
+                    small_model=model_vlm,
+                    big_model=model_editor,
+                    n_writeup_reflections=n_writeup_reflections,
+                    page_limit=page_limit,
+                )
+            child = PaperNode(
+                child_dir / "latex",
+                node.depth + 1,
+                parent=node,
+                llm_model=model_review,
+                vlm_model=model_vlm,
+            )
+            node.children.append(child)
+            safe_evaluate(
+                child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+            )
+            journal.append(child)
+            frontier.append((child.score, child))
+
+    return journal.best_node(orchestrator_model), journal
+
+
+def _crossover_papers(parent_a: PaperNode, parent_b: PaperNode, model: str) -> str:
+    """Use ``model`` to merge positive aspects of ``parent_b`` into ``parent_a``.
+
+    The returned string contains updated LaTeX code for ``parent_a``.
+    """
+
+    prompt = (
+        "You are an orchestrator model combining improvements from two LaTeX "
+        "drafts. Merge the positive qualities of Paper B into Paper A without "
+        "directly copying text. Return only the new LaTeX in a fenced ```latex"
+        " block.\n\n"
+        "#### PAPER A\n" + parent_a.tex_path.read_text() + "\n"
+        "#### PAPER B\n" + parent_b.tex_path.read_text()
+    )
+    client, m = llm.create_client(model)
+    resp = client.chat.completions.create(
+        model=m, messages=[{"role": "user", "content": prompt}], temperature=0.4
+    )
+    import re, textwrap
+
+    code = re.search(r"```latex\s*(.*?)```", resp.choices[0].message.content, re.DOTALL)
+    if not code:
+        raise ValueError("No LaTeX block returned by orchestrator model")
+    return textwrap.dedent(code.group(1)).strip()
+
+
+def map_elites_improve(
     root_dir: Path,
     seed_ideas: str,
     human_reviews: str | None = None,
@@ -304,80 +634,87 @@ def tree_search_improve(
     model_review: str = DEFAULT_MODEL,
     model_vlm: str = VLM_MODEL,
     orchestrator_model: str = ORCHESTRATOR_MODEL,
-):
-    """Priority-based tree search over paper versions."""
+    tournament_size: int = 3,
+    num_elites: int = 2,
+    llm_review_kwargs: dict | None = None,
+    vlm_review_kwargs: dict | None = None,
+) -> tuple[PaperNode | None, Journal]:
+    """Search using a simple MAP-ELITES strategy."""
+
     p = params or SearchParams(max_depth=3, beam_size=4)
+    if llm_review_kwargs is None:
+        llm_review_kwargs = p.llm_review_kwargs or {}
+    if vlm_review_kwargs is None:
+        vlm_review_kwargs = p.vlm_review_kwargs or {}
+
     root = PaperNode(root_dir, llm_model=model_review, vlm_model=model_vlm)
-    safe_evaluate(root)
+    safe_evaluate(root, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs)
     journal = Journal()
     journal.append(root)
-    frontier: list[tuple[float, PaperNode]] = [(-root.score, root)]
-    # Generate a few initial drafts and push them onto the priority queue
-    for i in range(p.num_drafts):
-        draft_dir = unique_subdir(root.latex_dir.parent, "draft")
-        shutil.copytree(root.latex_dir, draft_dir)
-        tex_path = draft_dir / "template.tex"
-        new_source = propose_edit(
-            tex_path, seed_ideas, human_reviews, model=model_editor
-        )
-        tex_path.write_text(new_source)
-        draft = PaperNode(
-            draft_dir,
-            root.depth + 1,
-            parent=root,
-            llm_model=model_review,
-            vlm_model=model_vlm,
-        )
-        root.children.append(draft)
-        draft.evaluate()
-        journal.append(draft)
-        heapq.heappush(frontier, (-draft.score, draft))  # min-heap by negative score
 
-    # Main priority queue loop
-    while frontier:
-        _, node = heapq.heappop(frontier)
-        logger.info(
-            "Exploring depth=%s dir=%s score=%.3f",
-            node.depth,
-            node.latex_dir,
-            node.score,
-        )
-        if node.depth >= p.max_depth:
-            continue
-        if (
-            node.is_buggy
-            and node.debug_depth < p.max_debug_depth
-            and random.random() < p.debug_prob
-        ):
-            tex_path = node.latex_dir / "template.tex"
-            new_src = propose_edit(
-                tex_path, seed_ideas, human_reviews, model=model_editor
-            )  # attempt recovery
-            tex_path.write_text(new_src)
-            node.debug_depth += 1
-            safe_evaluate(node)
-        # Expand by proposing ``beam_size`` edits from the current node
-        for i in range(p.beam_size):
-            child_dir = unique_subdir(node.latex_dir.parent, f"d{node.depth}")
-            shutil.copytree(node.latex_dir, child_dir)
-            tex_path = child_dir / "template.tex"
-            new_source = propose_edit(
-                tex_path,
-                seed_ideas,
-                human_reviews,
-                model=model_editor,
-            )  # one possible child mutation
-            tex_path.write_text(new_source)
-            child = PaperNode(
-                child_dir,
-                node.depth + 1,
-                parent=node,
-                llm_model=model_review,
-                vlm_model=model_vlm,
-            )
-            node.children.append(child)
-            safe_evaluate(child)
-            journal.append(child)
-            heapq.heappush(frontier, (-child.score, child))  # push onto heap by score
+    elites: dict[int, PaperNode] = {}
+
+    def add_elite(node: PaperNode) -> None:
+        idx = int((node.score or 0) // 1)
+        current = elites.get(idx)
+        if current is None or (node.score or 0) > (current.score or -1):
+            elites[idx] = node
+
+    add_elite(root)
+
+    frontier = [root]
+    depth = 0
+
+    while frontier and depth < p.max_depth:
+        next_frontier: list[PaperNode] = []
+        for state in frontier:
+            for _ in range(p.beam_size):
+                # Tournament selection among elites
+                candidates = random.sample(
+                    list(elites.values()), min(tournament_size, len(elites))
+                )
+                prompt = {
+                    "Introduction": "Select the best parent for crossover",
+                    "Candidates": "",
+                }
+                for n in candidates:
+                    prompt["Candidates"] += f"ID: {n.id} Score: {n.score}\n"
+                try:
+                    choice = query(
+                        system_message=prompt,
+                        user_message=None,
+                        func_spec=node_selection_spec,
+                        model=orchestrator_model,
+                        temperature=0.3,
+                    )
+                    parent_b = next(
+                        (n for n in candidates if n.id == choice["selected_id"]),
+                        candidates[0],
+                    )
+                except Exception:
+                    parent_b = max(candidates, key=lambda n: n.score or 0)
+
+                child_dir = unique_subdir(state.latex_dir.parent, f"m{depth}")
+                shutil.copytree(state.latex_dir, child_dir)
+                tex_path = child_dir / "template.tex"
+                new_source = _crossover_papers(state, parent_b, orchestrator_model)
+                tex_path.write_text(new_source)
+
+                child = PaperNode(
+                    child_dir,
+                    depth + 1,
+                    parent=state,
+                    llm_model=model_review,
+                    vlm_model=model_vlm,
+                )
+                state.children.append(child)
+                safe_evaluate(
+                    child, llm_kwargs=llm_review_kwargs, vlm_kwargs=vlm_review_kwargs
+                )
+                journal.append(child)
+                add_elite(child)
+                next_frontier.append(child)
+        frontier = next_frontier
+        depth += 1
 
     return journal.best_node(orchestrator_model), journal
