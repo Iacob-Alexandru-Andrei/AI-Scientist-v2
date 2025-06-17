@@ -126,7 +126,7 @@ class PaperNode:
     debug_depth: int = 0
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     score: float | None = None
-    llm_json: dict | None = None
+    llm_jsons: tuple[dict, ...] = ()
     vlm_json: dict | None = None
     is_buggy: bool = False
     is_buggy_plots: bool = False
@@ -146,7 +146,7 @@ class PaperNode:
             "llm_model": self.llm_model,
             "vlm_model": self.vlm_model,
             "score": self.score,
-            "llm_json": self.llm_json,
+            "llm_jsons": self.llm_jsons,
             "vlm_json": self.vlm_json,
             "is_buggy": self.is_buggy,
             "is_buggy_plots": self.is_buggy_plots,
@@ -169,7 +169,7 @@ class PaperNode:
         )
         node.id = data.get("id", node.id)
         node.score = data.get("score")
-        node.llm_json = data.get("llm_json")
+        node.llm_jsons = data.get("llm_jsons")
         node.vlm_json = data.get("vlm_json")
         node.is_buggy = data.get("is_buggy", False)
         node.is_buggy_plots = data.get("is_buggy_plots", False)
@@ -195,17 +195,21 @@ class PaperNode:
         vlm_kwargs = vlm_kwargs or {}
         print(llm_kwargs)
         # Run LLM and VLM reviews then compute an aggregate numeric score.
-        self.llm_json = llm_review(
+        self.llm_jsons, _ = llm_review(
             self.tex_path.read_text(), model=self.llm_model, **llm_kwargs
         )
         self.vlm_json = vlm_review(
             str(self.pdf_path), model=self.vlm_model, **vlm_kwargs
         )
-        self.score = meta_score([self.llm_json, self.vlm_json])
+        self.score = meta_score(self.llm_jsons + (self.vlm_json,))
         # Persist results for analysis
         with open(self.latex_dir.parent / "reviews.json", "w") as f:
+            llm_json_dump = {}
+            for i, llm_json in enumerate(self.llm_jsons):
+                llm_json_dump["id"] = f"llm_{i}"
+                llm_json_dump["review"] = llm_json
             json.dump(
-                {"llm": self.llm_json, "vlm": self.vlm_json, "score": self.score},
+                {"llm": llm_json_dump, "vlm": self.vlm_json, "score": self.score},
                 f,
                 indent=2,
             )
@@ -266,7 +270,7 @@ class Journal:
         }
         for n in self.nodes:
             prompt["Candidates"] += (
-                f"ID: {n.id} Score: {n.score:.3f} paper text: {n.tex_path.read_text()} paper reviews: {str(n.llm_json) + str(n.vlm_json)} \n"
+                f"ID: {n.id} Score: {n.score:.3f} paper text: {n.tex_path.read_text()} paper reviews: {str(n.llm_jsons) + str(n.vlm_json)} \n"
             )
 
         try:
@@ -327,7 +331,7 @@ def breadth_first_improve(
         new_source = propose_edit(
             tex_path,
             seed_ideas,
-            model_reviews=str(root.llm_json) + str(root.vlm_json),
+            model_reviews=str(root.llm_jsons) + str(root.vlm_json),
             human_reviews=human_reviews,
             model=model_editor,
         )  # model proposes a complete LaTeX rewrite of template.tex
@@ -385,7 +389,7 @@ def breadth_first_improve(
             new_source = propose_edit(
                 tex_path,
                 seed_ideas,
-                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                 human_reviews=human_reviews,
                 model=model_editor,
             )  # attempt to fix the buggy document
@@ -406,7 +410,7 @@ def breadth_first_improve(
             new_source = propose_edit(
                 tex_path,
                 seed_ideas,
-                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                 human_reviews=human_reviews,
                 model=model_editor,
             )  # LLM suggests an updated LaTeX file
@@ -477,7 +481,7 @@ def tree_search_improve(
         shutil.copytree(root.latex_dir.parent, draft_dir)
         success = perform_writeup(
             base_folder=draft_dir,
-            model_reviews=str(root.llm_json) + str(root.vlm_json),
+            model_reviews=str(root.llm_jsons) + str(root.vlm_json),
             human_reviews=human_reviews,
             num_cite_rounds=num_cite_rounds,
             small_model=model_vlm,
@@ -493,7 +497,7 @@ def tree_search_improve(
             shutil.copytree(root.latex_dir.parent, draft_dir)
             success = perform_writeup(
                 base_folder=draft_dir,
-                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                 human_reviews=human_reviews,
                 num_cite_rounds=num_cite_rounds,
                 small_model=model_vlm,
@@ -534,7 +538,7 @@ def tree_search_improve(
         ):
             perform_writeup(
                 base_folder=node.latex_dir.parent,
-                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                 human_reviews=human_reviews,
                 num_cite_rounds=num_cite_rounds,
                 small_model=model_vlm,
@@ -552,7 +556,7 @@ def tree_search_improve(
             shutil.copytree(node.latex_dir.parent, child_dir)
             success = perform_writeup(
                 base_folder=child_dir,
-                model_reviews=str(root.llm_json) + str(root.vlm_json),
+                model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                 human_reviews=human_reviews,
                 num_cite_rounds=num_cite_rounds,
                 small_model=model_vlm,
@@ -570,7 +574,7 @@ def tree_search_improve(
                 shutil.copytree(node.latex_dir.parent, child_dir)
                 success = perform_writeup(
                     base_folder=child_dir,
-                    model_reviews=str(root.llm_json) + str(root.vlm_json),
+                    model_reviews=str(root.llm_jsons) + str(root.vlm_json),
                     human_reviews=human_reviews,
                     num_cite_rounds=num_cite_rounds,
                     small_model=model_vlm,

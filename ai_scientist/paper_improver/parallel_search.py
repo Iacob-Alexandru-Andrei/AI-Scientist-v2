@@ -66,7 +66,7 @@ def _expand_and_score(
         new_source = propose_edit(
             tex_path,
             seed_ideas,
-            model_reviews=str(node.llm_json) + str(node.vlm_json),
+            model_reviews=str(node.llm_jsons) + str(node.vlm_json),
             human_reviews=human_reviews,
             model=model_editor,
         )

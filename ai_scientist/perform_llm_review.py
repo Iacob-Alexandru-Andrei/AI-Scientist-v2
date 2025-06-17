@@ -134,7 +134,7 @@ def perform_review(
     return_msg_history=False,
     reviewer_system_prompt=reviewer_system_prompt_neg,
     review_instruction_form=neurips_form,
-):
+) -> tuple[tuple[dict, ...], tuple[dict, ...]]:
     if num_fs_examples > 0:
         fs_prompt = get_review_fewshot_examples(num_fs_examples)
         base_prompt = review_instruction_form + fs_prompt
@@ -146,7 +146,7 @@ Here is the paper you are asked to review:
 ```
 {text}
 ```"""
-
+    parsed_reviews = []
     if num_reviews_ensemble > 1:
         llm_reviews, msg_histories = get_batch_responses_from_llm(
             base_prompt,
@@ -228,9 +228,11 @@ REVIEW JSON:
                 break
 
     if return_msg_history:
-        return review, msg_history
+        return tuple([review] if review is not None else [] + parsed_reviews), tuple(
+            msg_history
+        )
     else:
-        return review
+        return tuple([review] if review is not None else [] + parsed_reviews), ()
 
 
 reviewer_reflection_prompt = """Round {current_round}/{num_reflections}.

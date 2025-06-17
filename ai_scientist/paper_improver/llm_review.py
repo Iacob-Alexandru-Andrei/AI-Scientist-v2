@@ -25,7 +25,7 @@ def llm_review(
     return_msg_history: bool = False,
     reviewer_system_prompt=None,
     review_instruction_form=None,
-) -> dict[str, Any] | tuple[dict[str, Any], list]:
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
     """Run the standard LLM review and return the parsed JSON.
 
     Parameters
