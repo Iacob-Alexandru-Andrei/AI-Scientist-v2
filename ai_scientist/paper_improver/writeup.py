@@ -343,6 +343,7 @@ def get_citation_addition(
     idea_text,
     model_reviews,
     human_reviews,
+    recommended_improvements,
 ):
     report, citations = context
     msg_history = []
@@ -384,6 +385,11 @@ Which received the following initial human reviews:
 And the following list of ideas to improve it:
 ```
 {Idea}
+```
+
+And the following recommendations from an orchestrator model to improve the paper:
+```
+{recommended_improvements}
 ```
 
 Your current list of citations is:
@@ -445,6 +451,7 @@ This JSON will be automatically parsed, so ensure the format is precise."""
                 citations=citations,
                 model_reviews=model_reviews,
                 human_reviews=human_reviews,
+                recommended_improvements=recommended_improvements,
             ),
             client=client,
             model=model,
@@ -639,6 +646,11 @@ Seed ideas for improvement:
 {idea_text}
 ```
 
+Recommended improvements from an orchestrator model:
+```
+{recommended_improvements}
+```
+
 Available plots for the writeup (use these filenames):
 ```
 {plot_list}
@@ -770,6 +782,7 @@ def gather_citations(
     latex_text,
     model_reviews,
     human_reviews,
+    recommended_improvements,
     num_cite_rounds=20,
     small_model="gpt-4o-2024-05-13",
 ):
@@ -832,6 +845,7 @@ def gather_citations(
                     idea_text,
                     model_reviews,
                     human_reviews,
+                    recommended_improvements,
                 )
 
                 if done:
@@ -890,6 +904,7 @@ def perform_writeup(
     base_folder,
     model_reviews,
     human_reviews,
+    recommended_improvements="",
     citations_text=None,
     no_writing=False,
     num_cite_rounds=20,
@@ -963,6 +978,7 @@ def perform_writeup(
                         f.read(),
                         model_reviews,
                         human_reviews,
+                        recommended_improvements,
                         num_cite_rounds,
                         small_model,
                     )
@@ -1023,6 +1039,7 @@ def perform_writeup(
             plot_list=", ".join(plot_names),
             latex_writeup=writeup_text,
             plot_descriptions=plot_descriptions_str,
+            recommended_improvements=recommended_improvements,
         )
 
         response, msg_history = get_response_from_llm(
@@ -1239,7 +1256,7 @@ USE MINIMAL EDITS TO OPTIMIZE THE PAGE LIMIT USAGE."""
             base_folder, f"{osp.basename(base_folder)}_reflection_final_page_limit.pdf"
         )
         # Compile current version before reflection
-        print(f"[green]Compiling PDF for reflection final page limit...[/green]")
+        print("[green]Compiling PDF for reflection final page limit...[/green]")
 
         print(f"reflection step {i + 1}")
 
@@ -1264,7 +1281,7 @@ USE MINIMAL EDITS TO OPTIMIZE THE PAGE LIMIT USAGE."""
 
                 compile_latex(latex_folder, reflection_pdf)
             else:
-                print(f"No changes in reflection page step.")
+                print("No changes in reflection page step.")
 
         return osp.exists(reflection_pdf)
 
@@ -1272,53 +1289,3 @@ USE MINIMAL EDITS TO OPTIMIZE THE PAGE LIMIT USAGE."""
         print("EXCEPTION in perform_writeup:")
         print(traceback.format_exc())
         return False
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Perform writeup for a project")
-    parser.add_argument("--folder", type=str, help="Project folder", required=True)
-    parser.add_argument("--no-writing", action="store_true", help="Only generate")
-    parser.add_argument("--num-cite-rounds", type=int, default=20)
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0",
-        choices=AVAILABLE_LLMS,
-        help="Model to use for citation collection (small model).",
-    )
-    parser.add_argument(
-        "--big-model",
-        type=str,
-        default="o1-2024-12-17",
-        choices=AVAILABLE_LLMS,
-        help="Model to use for final writeup (big model).",
-    )
-    parser.add_argument(
-        "--writeup-reflections",
-        type=int,
-        default=3,
-        help="Number of reflection steps for the final LaTeX writeup.",
-    )
-    parser.add_argument(
-        "--page-limit",
-        type=int,
-        default=4,
-        help="Target page limit for the main paper (excluding references).",
-    )
-    args = parser.parse_args()
-
-    try:
-        success = perform_writeup(
-            base_folder=args.folder,
-            no_writing=args.no_writing,
-            num_cite_rounds=args.num_cite_rounds,
-            small_model=args.model,
-            big_model=args.big_model,
-            n_writeup_reflections=args.writeup_reflections,
-            page_limit=args.page_limit,
-        )
-        if not success:
-            print("Writeup process did not complete successfully.")
-    except Exception:
-        print("EXCEPTION in main:")
-        print(traceback.format_exc())

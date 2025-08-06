@@ -1,5 +1,5 @@
 from pathlib import Path
-from ai_scientist.paper_improver import search
+from ai_scientist.paper_improver import core
 
 
 def setup_dummy_env(tmp_path):
@@ -30,9 +30,9 @@ def fake_review(pdf_path):
     }
 
 
-class DummyJournal(search.Journal):
+class DummyJournal(core.Journal):
     # override best_node to avoid LLM call
-    def best_node(self, orchestrator_model=search.ORCHESTRATOR_MODEL):
+    def best_node(self, orchestrator_model=core.ORCHESTRATOR_MODEL):
         return max(self.nodes, key=lambda n: n.score or 0)
 
 
@@ -46,17 +46,17 @@ def run_search(impl, tmp_path, monkeypatch):
         self.score = float(counter["i"])
         return self.score
 
-    monkeypatch.setattr(search.PaperNode, "evaluate", patched_evaluate)
+    monkeypatch.setattr(core.PaperNode, "evaluate", patched_evaluate)
     monkeypatch.setattr(
-        search.PaperNode,
+        core.PaperNode,
         "compile",
         lambda self: fake_compile(self.latex_dir, self.pdf_path),
     )
-    monkeypatch.setattr(search, "propose_edit", fake_propose_edit)
-    monkeypatch.setattr(search, "llm_review", fake_review)
-    monkeypatch.setattr(search, "vlm_review", fake_review)
-    monkeypatch.setattr(search, "Journal", DummyJournal)
-    params = search.SearchParams(max_depth=2, beam_size=1, num_drafts=0)
+    monkeypatch.setattr(core, "propose_edit", fake_propose_edit)
+    monkeypatch.setattr(core, "llm_review", fake_review)
+    monkeypatch.setattr(core, "vlm_review", fake_review)
+    monkeypatch.setattr(core, "Journal", DummyJournal)
+    params = core.SearchParams(max_depth=2, beam_size=1, num_drafts=0)
     best, journal = impl(root, "ideas", None, params=params)
     for n in journal.nodes:
         print("NODE", n.depth, n.score)
@@ -65,12 +65,12 @@ def run_search(impl, tmp_path, monkeypatch):
 
 
 def test_bfs_and_tree_search(monkeypatch, tmp_path):
-    best_bfs, _ = run_search(search.breadth_first_improve, tmp_path, monkeypatch)
+    best_bfs, _ = run_search(core.breadth_first_improve, tmp_path, monkeypatch)
     assert best_bfs.depth == 2
 
     tmp2 = tmp_path / "other"
     tmp2.mkdir()
-    best_tree, _ = run_search(search.tree_search_improve, tmp2, monkeypatch)
+    best_tree, _ = run_search(core.tree_search_improve, tmp2, monkeypatch)
     assert best_tree.depth == 2
 
 
@@ -89,15 +89,19 @@ def test_search_params_usage(monkeypatch, tmp_path):
         self.score = float(counter["i"])
         return self.score
 
-    monkeypatch.setattr(search, "propose_edit", patched_propose)
-    monkeypatch.setattr(search.PaperNode, "evaluate", patched_evaluate)
-    monkeypatch.setattr(search.PaperNode, "compile", lambda self: fake_compile(self.latex_dir, self.pdf_path))
-    monkeypatch.setattr(search, "llm_review", fake_review)
-    monkeypatch.setattr(search, "vlm_review", fake_review)
-    monkeypatch.setattr(search, "Journal", DummyJournal)
+    monkeypatch.setattr(core, "propose_edit", patched_propose)
+    monkeypatch.setattr(core.PaperNode, "evaluate", patched_evaluate)
+    monkeypatch.setattr(
+        core.PaperNode,
+        "compile",
+        lambda self: fake_compile(self.latex_dir, self.pdf_path),
+    )
+    monkeypatch.setattr(core, "llm_review", fake_review)
+    monkeypatch.setattr(core, "vlm_review", fake_review)
+    monkeypatch.setattr(core, "Journal", DummyJournal)
 
-    params = search.SearchParams(max_depth=1, beam_size=2, num_drafts=3)
-    best, journal = search.breadth_first_improve(root, "ideas", None, params=params)
+    params = core.SearchParams(max_depth=1, beam_size=2, num_drafts=3)
+    best, journal = core.breadth_first_improve(root, "ideas", None, params=params)
 
     assert len(propose_calls) == 5  # 3 drafts + 2 expansions
     assert max(n.depth for n in journal.nodes) == 1
@@ -107,7 +111,7 @@ def test_search_params_usage(monkeypatch, tmp_path):
     tmp2.mkdir()
     propose_calls.clear()
     root2 = setup_dummy_env(tmp2)
-    best2, journal2 = search.tree_search_improve(root2, "ideas", None, params=params)
+    best2, journal2 = core.tree_search_improve(root2, "ideas", None, params=params)
 
     assert len(propose_calls) == 5
     assert max(n.depth for n in journal2.nodes) == 1
@@ -126,16 +130,18 @@ def test_debug_retry(monkeypatch, tmp_path):
         self.score = 1
         return 1
 
-    monkeypatch.setattr(search.PaperNode, "evaluate", failing_eval)
-    monkeypatch.setattr(search, "propose_edit", lambda *a, **k: "X")
-    monkeypatch.setattr(search.PaperNode, "compile", lambda self: None)
-    monkeypatch.setattr(search, "llm_review", lambda *a, **k: {})
-    monkeypatch.setattr(search, "vlm_review", lambda *a, **k: {})
-    monkeypatch.setattr(search, "Journal", DummyJournal)
-    monkeypatch.setattr(search.random, "random", lambda: 0.0)
+    monkeypatch.setattr(core.PaperNode, "evaluate", failing_eval)
+    monkeypatch.setattr(core, "propose_edit", lambda *a, **k: "X")
+    monkeypatch.setattr(core.PaperNode, "compile", lambda self: None)
+    monkeypatch.setattr(core, "llm_review", lambda *a, **k: {})
+    monkeypatch.setattr(core, "vlm_review", lambda *a, **k: {})
+    monkeypatch.setattr(core, "Journal", DummyJournal)
+    monkeypatch.setattr(core.random, "random", lambda: 0.0)
 
-    params = search.SearchParams(max_depth=1, beam_size=0, num_drafts=0, debug_prob=1.0, max_debug_depth=1)
-    best, journal = search.breadth_first_improve(root, "ideas", None, params=params)
+    params = core.SearchParams(
+        max_depth=1, beam_size=0, num_drafts=0, debug_prob=1.0, max_debug_depth=1
+    )
+    best, journal = core.breadth_first_improve(root, "ideas", None, params=params)
 
     assert len(calls) == 2
     assert best.debug_depth == 1
@@ -143,9 +149,9 @@ def test_debug_retry(monkeypatch, tmp_path):
 
 
 def test_orchestrator_model(monkeypatch):
-    j = search.Journal()
-    n1 = search.PaperNode(Path("a"))
-    n2 = search.PaperNode(Path("b"))
+    j = core.Journal()
+    n1 = core.PaperNode(Path("a"))
+    n2 = core.PaperNode(Path("b"))
     n1.score = 1
     n2.score = 2
     j.append(n1)
@@ -157,7 +163,7 @@ def test_orchestrator_model(monkeypatch):
         captured["model"] = kwargs.get("model")
         return {"selected_id": n2.id, "reasoning": ""}
 
-    monkeypatch.setattr(search, "query", fake_query)
+    monkeypatch.setattr(core, "query", fake_query)
     chosen = j.best_node("orch")
 
     assert captured["model"] == "orch"

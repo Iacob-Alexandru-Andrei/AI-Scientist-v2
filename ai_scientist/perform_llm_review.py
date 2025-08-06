@@ -61,8 +61,7 @@ For the "Decision" field, don't use Weak Accept, Borderline Accept, Borderline R
 This JSON will be automatically parsed, so ensure the format is precise.
 """
 
-neurips_form = (
-    """
+neurips_form_no_template = """
 ## Review Form
 Below is a description of the questions you will be asked on the review form for each paper and some guidelines on what to consider when answering these questions.
 When writing your review, please keep in mind that after decisions have been made, reviews and meta-reviews of accepted papers and opted-in rejected papers will be made public.
@@ -118,8 +117,7 @@ In general, authors should be rewarded rather than punished for being up front a
   2: You are willing to defend your assessment, but it is quite likely that you did not understand the central parts of the submission or that you are unfamiliar with some pieces of related work. Math/other details were not carefully checked.
   1: Your assessment is an educated guess. The submission is not in your area or the submission was difficult to understand. Math/other details were not carefully checked.
 """
-    + template_instructions
-)
+neurips_form = neurips_form_no_template + template_instructions
 
 
 def perform_review(

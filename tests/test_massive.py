@@ -1,5 +1,5 @@
 import pytest
-from ai_scientist.paper_improver import meta_review, utils, search
+from ai_scientist.paper_improver import core, meta_review, utils
 
 
 @pytest.mark.parametrize("overall", range(1, 51))
@@ -24,7 +24,7 @@ def test_unique_subdir_multiple(tmp_path, prefix):
 
 @pytest.mark.parametrize("idx", range(25))
 def test_searchparams_fields(idx):
-    p = search.SearchParams(
+    p = core.SearchParams(
         max_depth=idx + 1,
         beam_size=idx + 2,
         num_drafts=idx % 3,

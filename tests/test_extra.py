@@ -2,25 +2,25 @@ import types
 from pathlib import Path
 import pytest
 
-from ai_scientist.paper_improver import search, reflection, meta_review
+from ai_scientist.paper_improver import core, reflection, meta_review
 
 
 def test_safe_evaluate_marks_buggy(monkeypatch, tmp_path):
-    node = search.PaperNode(tmp_path)
+    node = core.PaperNode(tmp_path)
 
     def bad_eval(self):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(search.PaperNode, "evaluate", bad_eval)
-    res = search.safe_evaluate(node)
+    monkeypatch.setattr(core.PaperNode, "evaluate", bad_eval)
+    res = core.safe_evaluate(node)
     assert res is None
     assert node.is_buggy
 
 
 def test_journal_best_node_fallback(monkeypatch):
-    j = search.Journal()
-    n1 = search.PaperNode(Path("p1"))
-    n2 = search.PaperNode(Path("p2"))
+    j = core.Journal()
+    n1 = core.PaperNode(Path("p1"))
+    n2 = core.PaperNode(Path("p2"))
     n1.score = 1.0
     n2.score = 2.0
     j.append(n1)
@@ -29,7 +29,7 @@ def test_journal_best_node_fallback(monkeypatch):
     def boom(**kw):
         raise RuntimeError("fail")
 
-    monkeypatch.setattr(search, "query", boom)
+    monkeypatch.setattr(core, "query", boom)
     best = j.best_node("model")
     assert best is n2  # falls back to numeric max
 
@@ -58,7 +58,15 @@ def test_reflect_paper_early_exit(monkeypatch, tmp_path):
             class completions:
                 @staticmethod
                 def create(**kw):
-                    return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="```latex\nA\n```"))])
+                    return types.SimpleNamespace(
+                        choices=[
+                            types.SimpleNamespace(
+                                message=types.SimpleNamespace(
+                                    content="```latex\nA\n```"
+                                )
+                            )
+                        ]
+                    )
 
     monkeypatch.setattr(reflection, "compile_latex", fake_compile)
     monkeypatch.setattr(reflection, "create_client", lambda m: (DummyClient(), m))
@@ -66,7 +74,9 @@ def test_reflect_paper_early_exit(monkeypatch, tmp_path):
     monkeypatch.setattr(reflection, "perform_imgs_cap_ref_review", lambda *a, **k: {})
     monkeypatch.setattr(reflection, "detect_duplicate_figures", lambda *a, **k: {})
     monkeypatch.setattr(reflection, "get_reflection_page_info", lambda *a, **k: "")
-    monkeypatch.setattr(reflection.subprocess, "run", lambda *a, **k: types.SimpleNamespace(stdout=""))
+    monkeypatch.setattr(
+        reflection.subprocess, "run", lambda *a, **k: types.SimpleNamespace(stdout="")
+    )
 
     reflection.reflect_paper(root, num_rounds=3, model="m", vlm_model="v")
     # compile should be called once in loop and once at end -> 2
@@ -88,7 +98,9 @@ def test_cli_defaults(monkeypatch, tmp_path):
         captured["seed_ideas"] = seed_ideas
         captured["human_reviews"] = human_reviews
 
-    monkeypatch.setattr("ai_scientist.paper_improver.pipeline.improve_paper", fake_improve)
+    monkeypatch.setattr(
+        "ai_scientist.paper_improver.pipeline.improve_paper", fake_improve
+    )
     monkeypatch.setattr("ai_scientist.paper_improver.improve_paper", fake_improve)
 
     argv = ["prog", str(project), str(ideas)]
