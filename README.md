@@ -27,14 +27,15 @@ This system autonomously generates hypotheses, runs experiments, analyzes data, 
 
 ## Table of Contents
 
-1.  [Requirements](#requirements)
-    *   [Installation](#installation)
-    *   [Supported Models and API Keys](#supported-models-and-api-keys)
-2.  [Generate Research Ideas](#generate-research-ideas)
-3.  [Run AI Scientist-v2 Paper Generation Experiments](#run-ai-scientist-v2-paper-generation-experiments)
-4.  [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
-5.  [Frequently Asked Questions](#frequently-asked-questions)
-6.  [Acknowledgement](#acknowledgement)
+- [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Supported Models and API Keys](#supported-models-and-api-keys)
+- [Generate Research Ideas](#generate-research-ideas)
+- [Run AI Scientist-v2 Paper Generation Experiments](#run-ai-scientist-v2-paper-generation-experiments)
+- [Minimal Paper Improver Example](#minimal-paper-improver-example)
+- [Citing The AI Scientist-v2](#citing-the-ai-scientist-v2)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Acknowledgement](#acknowledgement)
 
 ## Requirements
 
@@ -155,6 +156,27 @@ python launch_scientist_bfts.py \
 Once the initial experimental stage is complete, you will find a timestamped log folder inside the `experiments/` directory. Navigate to `experiments/"timestamp_ideaname"/logs/0-run/` within that folder to find the tree visualization file `unified_tree_viz.html`.
 After all experiment stages are complete, the writeup stage begins. The writeup stage typically takes about 20 to 30 minutes in total. Once it finishes, you should see `timestamp_ideaname.pdf` in the `timestamp_ideaname` folder.
 For this example run, all stages typically finish within several hours.
+
+## Minimal Paper Improver Example
+
+For a quick demonstration of the `paper_improver` sub-pipeline, use the sample
+files located in `examples/paper_improver_minimal/`:
+
+```bash
+python scripts/launch_paper_improver.py examples/paper_improver_minimal \
+    examples/paper_improver_minimal/seed_ideas.json \
+    --human-reviews examples/paper_improver_minimal/human_reviews.txt \
+    --max-depth 1 --beam-size 1 \
+    --model-editor o1-preview-2024-09-12 \
+    --model-review gpt-4o-2024-11-20 \
+    --model-vlm gpt-4o-2024-11-20 \
+    --model-orchestrator gpt-4o-2024-11-20
+```
+
+You can override API keys at runtime via `--openai-api-key` or `--gemini-api-key`.
+
+This runs a single-depth search over the included LaTeX project and produces an
+improved version inside the same directory.
 
 ## Citing The AI Scientist-v2
 
