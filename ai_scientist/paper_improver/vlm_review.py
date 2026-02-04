@@ -1,0 +1,11 @@
+"""Figure-centric VLM review wrapper."""
+from ai_scientist.perform_vlm_review import perform_imgs_cap_ref_review
+from ai_scientist.vlm import create_client as create_vlm_client
+
+VLM_MODEL = "gpt-4o-2024-11-20"
+
+
+def vlm_review(pdf_path: str, *, model: str = VLM_MODEL) -> dict:
+    """Run the vision-language review over a compiled PDF."""
+    client, m = create_vlm_client(model)
+    return perform_imgs_cap_ref_review(client, m, pdf_path)
